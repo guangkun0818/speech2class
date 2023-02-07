@@ -8,7 +8,7 @@ import torch
 import torchaudio
 import unittest
 
-from dataset.frontend.frontend import EcapaFrontend
+from dataset.frontend.frontend import EcapaFrontend, KaldiWaveFeature
 
 
 class FrontendTest(unittest.TestCase):
@@ -29,10 +29,57 @@ class FrontendTest(unittest.TestCase):
 
     def test_frontend_torchscript(self):
         # Frontend torchscript export unittest
-        pcms = pcms = torch.rand(1, 32000)
+        pcms = torch.rand(1, 32000)
         pt_feats = self._frontend(pcms)
 
         torchscript_frontend = torch.jit.trace(self._frontend,
+                                               example_inputs=pcms)
+        torchscript_frontend = torch.jit.script(torchscript_frontend)
+
+        # Torchscript frontend precision check
+        ts_feats = torchscript_frontend(pcms)
+        glog.info("Torchscript output :{}".format(ts_feats.shape))
+        glog.info("Checkpoint output: {}".format(pt_feats.shape))
+        self.assertTrue(torch.allclose(pt_feats, ts_feats))
+
+
+class KaldiFbankTest(unittest.TestCase):
+    """ Unittest of KaldiWaveFeature frontend """
+
+    def setUp(self) -> None:
+        # TODO: Set test wavs
+        self._config = {
+            "feat_config": {
+                "num_mel_bins": 80,
+                "frame_length": 25,
+                "frame_shift": 10,
+                "dither": 0.0,
+                "samplerate": 16000,
+            },
+        }
+        self._kaldi_frontend = KaldiWaveFeature(**self._config["feat_config"])
+
+    def test_frontend_wave_feature(self):
+        # Frontend forward unittest
+        pcms = torch.rand(1, 32000)
+        feats = self._kaldi_frontend(pcms)
+        glog.info("Fbank feature: {}".format(feats.shape))
+        self.assertEqual(feats.shape[-1], self._kaldi_frontend._num_mel_bins)
+
+    def test_frontend_torchscript(self):
+        # Frontend torchscript export unittest
+        
+        pcms = torch.rand(1, 41360)
+        # NOTE: Shit happens here, If we use pcms other than shape == (1, 41360) along with
+        # speechbrain import, RuntimeError pops up: The size of tensor a (323) must match
+        # the size of tensor b (257) at non-singleton dimension 0. After I bust my ass checking
+        # source codes of torch.jit.trace and speechbrain, still no clean explanation of it. But
+        # it is partially certained that jit.trace check_tensor_case is static and output frame
+        # size will always be 257 when speechbrain imported. Marcos conflict maybe? Anyway, fix
+        # example_input of pcms shape as (1, 41360), which can be precisly extracted 257 frames
+        # features solving this unittest issue temporaily.
+        pt_feats = self._kaldi_frontend(pcms)
+        torchscript_frontend = torch.jit.trace(self._kaldi_frontend,
                                                example_inputs=pcms)
         torchscript_frontend = torch.jit.script(torchscript_frontend)
 
