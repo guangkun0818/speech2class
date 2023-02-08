@@ -28,5 +28,5 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python build_task.py \
 
 ## Formatted
 ```bash
-find ./ -path "./runtime" -prune -o iname "*.py" -print | xargs yapf -i --style google
+find ./ -path "./runtime" -prune -o -iname "*.py" -print | xargs yapf -i --style google
 ```

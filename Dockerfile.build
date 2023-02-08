@@ -12,7 +12,7 @@ RUN pip install cmake==3.22.1
 # ----- Python package related with training
 RUN conda install torchaudio=0.12.1 cudatoolkit=11.3 -c pytorch
 RUN pip install pytorch-lightning==1.8.6
-RUN pip install python-gflags=3.1.2
+RUN pip install python-gflags==3.1.2
 RUN pip install glog==0.3.1
 RUN pip install transformers==4.25.1
 RUN pip install speechbrain==0.5.13
