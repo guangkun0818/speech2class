@@ -136,7 +136,7 @@ class VprTrainDataset(BaseDataset):
     def __getitem__(self, index):
         """ Return:
                 {"feat": Tensor.float,
-                 "spk_id": Tensor.Long}
+                 "spk_id": Tensor.long}
         """
         data = self._dataset[index]
 
@@ -197,7 +197,7 @@ class VprEvalDataset(BaseDataset):
     def __getitem__(self, index):
         """ Return:
                 {"feat": Tensor.float,
-                 "spk_id": Tensor.Long}
+                 "spk_id": Tensor.long}
         """
         data = self._dataset[index]
 
@@ -212,6 +212,136 @@ class VprEvalDataset(BaseDataset):
             "feat": feat,
             "label": torch.tensor(self._spk_label[data["spk_id"]])
         }
+
+
+class VadTrainDataset(BaseDataset):
+    """ TrainDataset for VAD task, note that JSON of file input is required. 
+        NOTE: Set num workers of DataLoader to get considerable performance
+    """
+
+    def __init__(self, config) -> None:
+        super(VadTrainDataset,
+              self).__init__(config["train_data"],
+                             noiseset_json=config["noise_data"],
+                             min_dur_filter=config["min_dur_filter"])
+
+        glog.info("Training dataset: {}h with {} entries.".format(
+            self.total_duration / 3600, len(self)))
+
+        self._chunk_size = config["chunk_size"]
+
+        # Data Augmentation, on-the-fly fashion
+        self._add_noise_proportion = config["add_noise_proportion"]
+        self._add_noise_config = config["add_noise_config"]
+        self._add_noise = data_augmentation.add_noise
+
+        if config["feat_type"] == "fbank":
+            self._frontend = KaldiWaveFeature(**config["feat_config"])
+        elif config["feat_type"] == "ecapa":
+            self._frontend = EcapaFrontend()
+        else:
+            NotImplementedError
+
+    def _spilt_chunk(self, feat, label):
+        # Split chunks from raw feats.
+        offset = random.randint(0, label.shape[0] - self._chunk_size)
+        feat = feat[offset:offset + self._chunk_size, :]
+        label = label[offset:offset + self._chunk_size]
+        return feat, label
+
+    def __getitem__(self, index):
+        """ Return:
+                {"feat": Tensor.float,
+                 "label": Tensor.long}
+        """
+        data = self._dataset[index]
+
+        assert "audio_filepath" in data
+        assert "label" in data
+        pcm, _ = torchaudio.load(data["audio_filepath"], normalize=True)
+
+        # Data Augmentation
+        # Use add noise proportion control the augmentation ratio of all dataset
+        need_noisify_aug = random.uniform(0, 1) < self._add_noise_proportion
+        if need_noisify_aug:
+            noise_pcm, _ = torchaudio.load(random.choice(self._noise_dataset),
+                                           normalize=True)
+            pcm = self._add_noise(pcm, noise_pcm, **self._add_noise_config)
+
+        feat = self._frontend(pcm)
+        label_info = data["label"]
+        if label_info.startswith("NS"):
+            # Indicating this is a total noise file, so label as zeros.
+            label = torch.zeros(feat.shape[1]).long()
+        else:
+            label = self._read_label_from_hdf5(label_info)
+            # feats: (T, D); label: (T)
+            # NOTE: Assertion to check frame length match between feats and label.
+            # Label of vad dataset is strictly follow the framing strategy of acoustic
+            # feature extraction, that is 25ms frame_size, 10ms frame_shift and
+            # drop_last without padding (like dataloader drop last). Thus, if any
+            # problem encountered by following length check, please review your frontend
+            # config and vad dataset generating pipeline codes sequentially.
+            glog.check_eq(feat.shape[0], label.shape[0])
+
+        feat, label = self._spilt_chunk(feat, label)
+
+        return {"feat": feat, "label": label}
+
+
+class VadEvalDataset(BaseDataset):
+    """ EvalDataset for VAD task. """
+
+    def __init__(self, config) -> None:
+        super(VadEvalDataset,
+              self).__init__(config["eval_data"],
+                             min_dur_filter=config["min_dur_filter"])
+
+        glog.info("EvalDataset dataset: {}h with {} entries.".format(
+            self.total_duration / 3600, len(self)))
+
+        self._chunk_size = config["chunk_size"]
+
+        if config["feat_type"] == "fbank":
+            self._frontend = KaldiWaveFeature(**config["feat_config"])
+        elif config["feat_type"] == "ecapa":
+            self._frontend = EcapaFrontend()
+        else:
+            NotImplementedError
+
+    def _spilt_chunk(self, feat, label):
+        # NOTE: Evaluation with chunk is prefered for batching and has
+        # no downgrade on metric acc compared with chunk-free.
+        offset = random.randint(0, label.shape[0] - self._chunk_size)
+        feat = feat[offset:offset + self._chunk_size, :]
+        label = label[offset:offset + self._chunk_size]
+        return feat, label
+
+    def __getitem__(self, index):
+        """ Return:
+                {"feat": Tensor.float,
+                 "label": Tensor.long}
+        """
+        data = self._dataset[index]
+
+        assert "audio_filepath" in data
+        assert "label" in data
+        pcm, _ = torchaudio.load(data["audio_filepath"], normalize=True)
+
+        feat = self._frontend(pcm)
+
+        label_info = data["label"]
+        if label_info.startswith("NS"):
+            # Indicating this is a total noise file, so label as zeros.
+            label = torch.zeros(feat.shape[1]).long()
+        else:
+            label = self._read_label_from_hdf5(label_info)
+            # feats: (T, D); label: (T)
+            glog.check_eq(feat.shape[0], label.shape[0])
+
+        feat, label = self._spilt_chunk(feat, label)
+
+        return {"feat": feat, "label": label}
 
 
 def collate_fn(raw_batch):
