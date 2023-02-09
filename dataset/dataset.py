@@ -297,7 +297,7 @@ class VadEvalDataset(BaseDataset):
               self).__init__(config["eval_data"],
                              min_dur_filter=config["min_dur_filter"])
 
-        glog.info("EvalDataset dataset: {}h with {} entries.".format(
+        glog.info("Evaluation dataset: {}h with {} entries.".format(
             self.total_duration / 3600, len(self)))
 
         self._chunk_size = config["chunk_size"]
@@ -341,6 +341,46 @@ class VadEvalDataset(BaseDataset):
 
         feat, label = self._spilt_chunk(feat, label)
 
+        return {"feat": feat, "label": label}
+
+
+class VadTestDataset(BaseDataset):
+    """ Test Dataset for vad task inference. TorchScript frontend will be
+        utilized. Chunkization will be exclude and batch_size shall be 1.
+    """
+
+    def __init__(self, dataset_json, frontend) -> None:
+        # Testset should not filter any of the data.
+        super(VadTestDataset, self).__init__(dataset_json=dataset_json)
+        glog.info("Test dataset: {}h with {} entries.".format(
+            self.total_duration / 3600, len(self)))
+
+        # Load Torchscript frontend to init feature extraction session
+        self._frontend_sess = torch.jit.load(frontend)
+
+    def __getitem__(self, index):
+        """ Return:
+                {"feat": Tensor.float,
+                 "label": Tensor.long}
+        """
+        data = self._dataset[index]
+
+        assert "audio_filepath" in data
+        assert "label" in data
+        pcm, _ = torchaudio.load(data["audio_filepath"], normalize=True)
+
+        feat = self._frontend_sess(pcm)
+
+        label_info = data["label"]
+        if label_info.startswith("NS"):
+            # Indicating this is a total noise file, so label as zeros.
+            label = torch.zeros(feat.shape[1]).long()
+        else:
+            label = self._read_label_from_hdf5(label_info)
+            # feats: (T, D); label: (T)
+            glog.check_eq(feat.shape[0], label.shape[0])
+
+        # Chunk split exluded.
         return {"feat": feat, "label": label}
 
 
