@@ -8,7 +8,7 @@ import unittest
 import torch
 from parameterized import parameterized
 from model.vad_model.crdnn import Conv1dCnnBlock, Conv2dCnnBlock, CnnBlockConfig
-# from model.vad model.crdnn import DNNBlock, DINBlockconfig
+from model.vad_model.crdnn import DnnBlock, DnnBlockConfig
 # from model, vad model,crdnn import LstmRNNBlock, GruRNNElock, RNNBlockconfig
 # from model.vad model, crdnn import CRDNN, CRDNNConfig
 
@@ -165,6 +165,24 @@ class TestCnnBlock(unittest.TestCase):
                            stream_output,
                            rtol=3e-5,
                            atol=3e-7))
+
+
+class TestDnnBlock(unittest.TestCase):
+    """ Unittest of DnnBLock """
+
+    def setUp(self) -> None:
+        config = {"num_layers": 4, "hidden_dim": 64}
+        self._dnn_block = DnnBlock(_input_dim=320,
+                                   config=DnnBlockConfig(**config))
+
+    @parameterized.expand([(101,), (156,), (271,)])
+    def test_dnn_block_forward(self, feat_len):
+        # Unittest of Dnn Block forward, unittest of inference will be ommitted
+        # since shareing same graph with training.
+        feats = torch.rand(4, feat_len, self._dnn_block._input_dim)
+        output = self._dnn_block(feats)
+        self.assertEqual(output.shape[1], feat_len)
+        self.assertEqual(output.shape[-1], self._dnn_block._hidden_dim)
 
 
 if __name__ == "__main__":

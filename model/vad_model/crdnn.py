@@ -322,3 +322,47 @@ class DnnBlockConfig:
     num_layers: int = 2
     hidden_dim: int = 64
     dropout_p: float = 0.15
+
+
+class DnnBlock(nn.Module):
+    """ DNN Block Impl, naturally support streaming mode """
+
+    def __init__(self, _input_dim: int, config: DnnBlockConfig):
+        super(DnnBlock, self).__init__()
+        # Initialization
+        self._input_dim = _input_dim
+        self._num_layers = config.num_layers
+        self._hidden_dim = config.hidden_dim
+        self._dropout_p = config.dropout_p
+
+        self._dnn_layers = nn.Sequential(*self._make_dnn_layers())
+
+    def _make_dnn_layers(self) -> List[nn.Module]:
+        # Make dnn layer from config
+        dnn_layers = []
+        for layer_id in range(self._num_layers):
+            if layer_id == 0:
+                dnn_layers.append(
+                    nn.Sequential(nn.Linear(self._input_dim, self._hidden_dim),
+                                  nn.LeakyReLU(),
+                                  nn.Dropout(p=self._dropout_p)))
+            else:
+                dnn_layers.append(
+                    nn.Sequential(nn.Linear(self._hidden_dim, self._hidden_dim),
+                                  nn.LeakyReLU(),
+                                  nn.Dropout(p=self._dropout_p)))
+        return dnn_layers
+
+    @property
+    def output_dim(self) -> int:
+        return self._hidden_dim
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Training graph
+        return self._dnn_layers(x)
+
+    @torch.jit.export
+    @torch.inference_mode(mode=True)
+    def inference(self, x: torch.Tensor) -> torch.Tensor:
+        # Inference graph, cache-free
+        return self._dnn_layers(x)
