@@ -9,7 +9,7 @@ import torch
 from parameterized import parameterized
 from model.vad_model.crdnn import Conv1dCnnBlock, Conv2dCnnBlock, CnnBlockConfig
 from model.vad_model.crdnn import DnnBlock, DnnBlockConfig
-# from model, vad model,crdnn import LstmRNNBlock, GruRNNElock, RNNBlockconfig
+from model.vad_model.crdnn import LstmRnnBlock, GruRnnBlock, RnnBlockConfig
 # from model.vad model, crdnn import CRDNN, CRDNNConfig
 
 
@@ -183,6 +183,100 @@ class TestDnnBlock(unittest.TestCase):
         output = self._dnn_block(feats)
         self.assertEqual(output.shape[1], feat_len)
         self.assertEqual(output.shape[-1], self._dnn_block._hidden_dim)
+
+
+class TestRnnBlock(unittest.TestCase):
+    """ Unittest of RnnBlock """
+
+    def setUp(self) -> None:
+        config = {
+            "rnn_type": "lstm",
+            "hidden_size": 256,
+            "num_layers": 2,
+            "batch_first": True,
+            "dropout": 0.0,
+            "bidirectional": False
+        }
+        self._lstm_rnn_block = LstmRnnBlock(_input_dim=64,
+                                            config=RnnBlockConfig(**config))
+        config = {
+            "rnn_type": "gru",
+            "hidden_size": 512,
+            "num_layers": 2,
+            "batch_first": True,
+            "dropout": 0.0,
+            "bidirectional": False
+        }
+        self._gru_rnn_block = GruRnnBlock(_input_dim=128,
+                                          config=RnnBlockConfig(**config))
+
+    @parameterized.expand([(101,), (156,), (271,)])
+    def test_lstm_rnn_block_forward(self, feat_len):
+        # Unittest of LSTM Training graph
+        feats = torch.rand(4, feat_len, self._lstm_rnn_block._input_size)
+        output = self._lstm_rnn_block(feats)
+
+        self.assertEqual(output.shape[1], feat_len)
+        self.assertEqual(output.shape[-1], self._lstm_rnn_block.output_dim)
+
+    @parameterized.expand([(101,), (156,), (271,)])
+    def test_lstm_rnn_block_streaming_inference(self, feat_len):
+        # Unittest of LSTM streaming inference graph
+        self._lstm_rnn_block.train(False)
+        feats = torch.rand(1, feat_len, self._lstm_rnn_block._input_size)
+        cache = self._lstm_rnn_block.initialize_rnn_cache()
+        non_stream_output = self._lstm_rnn_block(feats)
+
+        # Streaming mode
+        stream_output = []
+        for frame_id in range(0, feat_len, 1):
+            # Simulate streaming inference
+            output, cache = self._lstm_rnn_block.inference(
+                feats[:, frame_id:frame_id + 1, :], cache)
+            stream_output.append(output)
+        stream_output = torch.concat(stream_output, dim=1)
+
+        # with maximum abs diff of precision with 2e-7
+        glog.info(torch.max(stream_output - non_stream_output))
+        self.assertTrue(
+            torch.allclose(non_stream_output,
+                           stream_output,
+                           rtol=3e-5,
+                           atol=3e-7))
+
+    @parameterized.expand([(101,), (156,), (271,)])
+    def test_gru_rnn_block_forward(self, feat_len):
+        # Unittest of GRU Training graph
+        feats = torch.rand(4, feat_len, self._gru_rnn_block._input_size)
+        output = self._gru_rnn_block(feats)
+
+        self.assertEqual(output.shape[1], feat_len)
+        self.assertEqual(output.shape[-1], self._gru_rnn_block.output_dim)
+
+    @parameterized.expand([(101,), (156,), (271,)])
+    def test_gru_rnn_block_streaming_inference(self, feat_len):
+        # Unittest of GRU streaming inference graph
+        self._gru_rnn_block.train(False)
+        feats = torch.rand(1, feat_len, self._gru_rnn_block._input_size)
+        cache = self._gru_rnn_block.initialize_rnn_cache()
+        non_stream_output = self._gru_rnn_block(feats)
+
+        # Streaming mode
+        stream_output = []
+        for frame_id in range(0, feat_len, 1):
+            # Simulate streaming inference
+            output, cache = self._gru_rnn_block.inference(
+                feats[:, frame_id:frame_id + 1, :], cache)
+            stream_output.append(output)
+        stream_output = torch.concat(stream_output, dim=1)
+
+        # with maximum abs diff of precision with 2e-7
+        glog.info(torch.max(stream_output - non_stream_output))
+        self.assertTrue(
+            torch.allclose(non_stream_output,
+                           stream_output,
+                           rtol=3e-5,
+                           atol=3e-7))
 
 
 if __name__ == "__main__":

@@ -325,7 +325,7 @@ class DnnBlockConfig:
 
 
 class DnnBlock(nn.Module):
-    """ DNN Block Impl, naturally support streaming mode """
+    """ Dnn Block Impl, naturally support streaming mode """
 
     def __init__(self, _input_dim: int, config: DnnBlockConfig):
         super(DnnBlock, self).__init__()
@@ -366,3 +366,138 @@ class DnnBlock(nn.Module):
     def inference(self, x: torch.Tensor) -> torch.Tensor:
         # Inference graph, cache-free
         return self._dnn_layers(x)
+
+
+@dataclasses.dataclass
+class RnnBlockConfig:
+    """ Rnn Block config of Crdnn """
+    rnn_type: str = "lstm"
+    hidden_size: int = 128
+    num_layers: int = 2
+    batch_first: bool = True
+    dropout: float = 0.0
+    bidirectional: bool = False
+
+
+class RnnBlockBase(nn.Module):
+    """ NOTE: Base model of Rnn block, LSTM and GRU type shall inherit from 
+        it. Basically this desgin is for torchscript export which should avoid 
+        inconsistency of cache between LSTM and GRU, Tuple[h_0, c_0] and h_0
+        respectivly. Rnn naturally support streaming mode with cache. 
+    """
+
+    def __init__(self, _input_dim: int, config: RnnBlockConfig):
+        super(RnnBlockBase, self).__init__()
+        # Initialization
+        self._input_size = _input_dim
+        self._hidden_size = config.hidden_size
+        self._num_layers = config.num_layers
+        self._batch_first = config.batch_first
+        self._dropout = config.dropout
+        self._bidirectional = config.bidirectional
+
+        self._layernorm = nn.LayerNorm(self._input_size)
+
+    def _make_rnn_layers(self, layer: nn.Module) -> nn.Module:
+        # Build Rnn layers with specific type rnn
+        rnn_layers = layer(input_size=self._input_size,
+                           hidden_size=self._hidden_size,
+                           num_layers=self._num_layers,
+                           batch_first=self._batch_first,
+                           dropout=self._dropout,
+                           bidirectional=self._bidirectional)
+        return rnn_layers
+
+    @property
+    def output_dim(self):
+        return self._hidden_size
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Training graph
+        x = self._layernorm(x)
+        x, _ = self._rnn_layers(x)
+        return x
+
+    @torch.jit.export
+    @abc.abstractmethod
+    def initialize_rnn_cache(self):
+        # Initialize rnn cache when streaming inference start. Batch size = 1 is mandatory.
+        # GRU cache: Tuple[torch.Tensor, dummy_tensor]; LSTM cache: Tuple[torch.Tensor, torch.Tensor]
+        ...
+
+    @torch.jit.export
+    @torch.inference_mode(mode=True)
+    @abc.abstractmethod
+    def inference(self, x: torch.Tensor, cache):
+        """ "feat": (B, T, D)
+            "cache": (h_O, c_0) for LSTM, (h_O, dummy_cache) for GRU
+        """
+        ...
+
+
+class GruRnnBlock(RnnBlockBase):
+    """ GRU Rnn block impl """
+
+    def __init__(self, _input_dim: int, config: RnnBlockConfig):
+        super(GruRnnBlock, self).__init__(_input_dim, config)
+        assert config.rnn_type == "gru"
+        self._rnn_type = config.rnn_type
+        self._rnn_layers = self._make_rnn_layers(nn.GRU)
+
+    @torch.jit.export
+    def initialize_rnn_cache(self) -> Tuple[torch.Tensor, torch.Tensor]:
+        # NOTE: Originally GRU cache is solely h_0. However considering of torchscript export,
+        # which has strict data type indication of funcs, cache init shall be consist with LSTM.
+        cache = (torch.zeros(self._num_layers, 1, self._hidden_size),
+                 torch.zeros(0))  # h_0, dummy_cache
+        return cache
+
+    @torch.inference_mode(mode=True)
+    def inference(self, x: torch.Tensor, cache: Tuple[torch.Tensor,
+                                                      torch.Tensor]):
+        """ "feat": (B, T, D)
+            "cache": (h_0, dummy_cache) for GRU
+        """
+        # Streaming inference graph
+        x = self._layernorm(x)
+        output, next_cache = self._rnn_layers(x, cache[0].to(x.device))
+
+        return output, (next_cache, cache[1])  # maintain the dummy cache
+
+
+class LstmRnnBlock(RnnBlockBase):
+    """ LSTM Rnn block impl """
+
+    def __init__(self, _input_dim: int, config: RnnBlockConfig):
+        super(LstmRnnBlock, self).__init__(_input_dim, config)
+        assert config.rnn_type == "lstm"
+        self._rnn_type = config.rnn_type
+        self._rnn_layers = self._make_rnn_layers(nn.LSTM)
+
+    @torch.jit.export
+    def initialize_rnn_cache(self) -> Tuple[torch.Tensor, torch.Tensor]:
+        # Initialize rnn cache when streaming inference start. Batch size = 1 is mandatory.
+        # LSTM cache: Tuple[torch.Tensor, torch.Tensor]
+        cache = (torch.zeros(self._num_layers, 1, self._hidden_size),
+                 torch.zeros(self._num_layers, 1,
+                             self._hidden_size))  # h_0, c_0
+        return cache
+
+    @torch.jit.export
+    @torch.inference_mode(mode=True)
+    def inference(self, x: torch.Tensor, cache: Tuple[torch.Tensor,
+                                                      torch.Tensor]):
+        """ "feat": (B, T, D)
+            "cache": (h_0, c_0) for LSTM
+        """
+        # Streaming inference graph
+        x = self._layernorm(x)
+        output, next_cache = self._rnn_layers(
+            x, (cache[0].to(x.device), cache[1].to(x.device)))
+
+        return output, next_cache
+
+
+@dataclasses.dataclass
+class CrdnnConfig:
+    """ Crdnn Model config interface """
