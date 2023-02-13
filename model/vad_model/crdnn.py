@@ -501,3 +501,81 @@ class LstmRnnBlock(RnnBlockBase):
 @dataclasses.dataclass
 class CrdnnConfig:
     """ Crdnn Model config interface """
+    cnn_block_config: CnnBlockConfig = CnnBlockConfig()
+    dnn_block_config: DnnBlockConfig = DnnBlockConfig()
+    rnn_block_config: RnnBlockConfig = RnnBlockConfig()
+
+
+class Crdnn(nn.Module):
+    """ Vad model Crdnn impl, build with Cnn, Dnn, Rnn blocks """
+
+    def __init__(self, config: CrdnnConfig):
+        super(Crdnn, self).__init__()
+        # Initialization
+        # CnnBlock initialize
+        if config.cnn_block_config["conv_type"] == "conv1d":
+            self._cnn_blocks = Conv1dCnnBlock(config=CnnBlockConfig(
+                **config.cnn_block_config))
+        elif config.cnn_block_config["conv_type"] == "conv2d":
+            self._cnn_blocks = Conv2dCnnBlock(config=CnnBlockConfig(
+                **config.cnn_block_config))
+
+        # DnnBlock initialize
+        self._dnn_blocks = DnnBlock(
+            _input_dim=self._cnn_blocks.output_dim,
+            config=DnnBlockConfig(**config.dnn_block_config))
+
+        # RnnBlock initialize
+        if config.rnn_block_config["rnn_type"] == "gru":
+            self._rnn_blocks = GruRnnBlock(
+                _input_dim=self._dnn_blocks.output_dim,
+                config=RnnBlockConfig(**config.rnn_block_config))
+        elif config.rnn_block_config["rnn_type"] == "lstm":
+            self._rnn_blocks = LstmRnnBlock(
+                _input_dim=self._dnn_blocks.output_dim,
+                config=RnnBlockConfig(**config.rnn_block_config))
+
+        # Output layer initialize, linearly transform into dim = 2
+        self._output_layer = nn.Linear(in_features=self._rnn_blocks.output_dim,
+                                       out_features=2)
+        self._softmax = nn.Softmax(dim=-1)
+
+    @torch.jit.export
+    def compute_logits(self, x: torch.Tensor) -> torch.Tensor:
+        # Compute softmax logits.
+        return self._softmax(x)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Training Graph
+        x = self._cnn_blocks(x)
+        x = self._dnn_blocks(x)
+        x = self._rnn_blocks(x)
+        x = self._output_layer(x)  # output: (B, T, 2)
+        return x
+
+    @torch.jit.export
+    def initialize_cache(self):
+        # Initialize cache when inference start, Batch size = 1
+        # DNN does not need cache.
+        cnn_cache = self._cnn_blocks.initialize_cnn_cache()
+        rnn_cache = self._rnn_blocks.initialize_rnn_cache()
+
+        return (cnn_cache, rnn_cache)
+
+    @torch.jit.export
+    @torch.inference_mode(mode=True)
+    def inference(self, x: torch.Tensor, cache: Tuple[List[torch.Tensor],
+                                                      Tuple[torch.Tensor,
+                                                            torch.Tensor]]):
+        # Streaming inference impl by using inference interface of all blocks.
+        cnn_cache = cache[0]  # cnn_cache
+        rnn_cache = cache[1]  # rnn_cache
+
+        x, cnn_cache = self._cnn_blocks.inference(x, cnn_cache)
+        x = self._dnn_blocks.inference(x)
+        x, rnn_cache = self._rnn_blocks.inference(x, rnn_cache)
+        x = self._output_layer(x)
+        logits = self._softmax(x)
+
+        return logits, (cnn_cache, rnn_cache
+                       )  # Cache for next chunk or frame input
