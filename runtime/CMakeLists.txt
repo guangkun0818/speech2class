@@ -1,9 +1,12 @@
 cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
 
-project (vad_runtime LANGUAGES CXX C VERSION 0.1)
+project(
+  vad_runtime
+  LANGUAGES CXX C
+  VERSION 0.1)
 
 # libTorch requires C++14 at least
-set (CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 17)
 
 include(CTest)
 include(FetchContent)
