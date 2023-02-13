@@ -20,7 +20,8 @@ class VadModel(nn.Module):
         if config["model"] == "Crdnn":
             self.vad_model = Crdnn(config=CrdnnConfig(**config["config"]))
         else:
-            raise ValueError("Vad model {} not supported.".format(config["model"]))
+            raise ValueError("Vad model {} not supported.".format(
+                config["model"]))
 
     def forward(self, feats):
         """ Training graph """
