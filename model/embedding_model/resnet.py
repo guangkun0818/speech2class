@@ -39,7 +39,7 @@ class BasicBlock(nn.Module):
             nn.BatchNorm2d(out_channels * self.EXPANSION))
 
         # Shortcut
-        self._short_cut = nn.Sequential()
+        self._shortcut = nn.Sequential()
 
         # The shortcut output dimension is not the same with residual
         # function, using 1 * 1 conv to fix the mismatch
@@ -138,7 +138,7 @@ class StatisticPooling(nn.Module):
     @property
     def output_dim(self):
         # Public property for embedding layer config
-        return self.output_dim
+        return self._output_dim
 
     def forward(self, x: torch.Tensor):
         # Training Graph
@@ -308,7 +308,7 @@ class ResNet(nn.Module):
         output = x.unsqueeze(1)
         output = output.transpose(2, 3)
         output = self._conv_sub_sampling(output)
-        output - self._resnet_block_1(output)
+        output = self._resnet_block_1(output)
         output = self._resnet_block_2(output)
         output = self._resnet_block_3(output)
         output = self._resnet_block_4(output)
@@ -323,14 +323,14 @@ class ResNet(nn.Module):
         return output
 
     @torch.inference_mode(mode=True)
-    def forward(self, x: torch.Tensor):
+    def inference(self, x: torch.Tensor):
         # Training graph
         # Input shape: (Batch size, Seq_len, feats_dim)
 
         output = x.unsqueeze(1)
         output = output.transpose(2, 3)
         output = self._conv_sub_sampling(output)
-        output - self._resnet_block_1(output)
+        output = self._resnet_block_1(output)
         output = self._resnet_block_2(output)
         output = self._resnet_block_3(output)
         output = self._resnet_block_4(output)
