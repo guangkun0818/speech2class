@@ -61,7 +61,7 @@ def run_task():
     # ----- Task Build -----
     # Setup pretrained-model if finetune/base_model is set
     if config["finetune"]["base_model"]:
-        # If base_model of finetune is set, then finetune from base _model
+        # If base_model of finetune is set, then finetune from base_model
         task = TaskFactory[TASK_TYPE].value.load_from_checkpoint(
             config["finetune"]["base_model"], config=config)
     else:
