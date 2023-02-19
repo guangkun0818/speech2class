@@ -75,7 +75,7 @@ def run_task():
         dirpath=os.path.join(TASK_EXPORT_PATH, "checkpoints"),
         filename=chkpt_filename,
         **config["callbacks"]
-        ["model chkpt config"])  # Callbacks save chkpt of model.
+        ["model_chkpt_config"])  # Callbacks save chkpt of model.
 
     lr_monitor = callbacks.LearningRateMonitor(logging_interval='step')
     callback_funcs = [chkpt_callback, lr_monitor]

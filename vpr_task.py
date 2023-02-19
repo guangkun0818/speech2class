@@ -29,7 +29,7 @@ class VprTask(pl.LightningModule):
         self._embedding_model_config = config["embedding_model"]
         self._loss_config = config["loss"]
         self._metric_config = config["metric"]
-        self._optim_config = config["optimizer"]
+        self._optim_config = config["optim_setup"]
 
         # Build all components with given yaml config
         self._frontend = self._get_frontend(copy.deepcopy(config["dataset"]))
@@ -61,7 +61,7 @@ class VprTask(pl.LightningModule):
                                 shuffle=True,
                                 collate_fn=collate_fn,
                                 batch_size=self._dataset_config["batch_size"],
-                                num_workers=self._dataset_config["num workers"])
+                                num_workers=self._dataset_config["num_workers"])
         return dataloader
 
     def val_dataloader(self):
@@ -71,7 +71,7 @@ class VprTask(pl.LightningModule):
         dataloader = DataLoader(dataset=dataset,
                                 collate_fn=collate_fn,
                                 batch_size=self._dataset_config["batch_size"],
-                                num_workers=self._dataset_config["num workers"])
+                                num_workers=self._dataset_config["num_workers"])
         return dataloader
 
     def training_step(self, batch, batch_idx):
@@ -132,6 +132,6 @@ class VprTask(pl.LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": lr_scheduler,
-                **self._optim_config["Ir_scheduler"]["step_config"]
+                **self._optim_config["lr_scheduler"]["step_config"]
             }
         }

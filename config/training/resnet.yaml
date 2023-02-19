@@ -1,0 +1,101 @@
+# Resnet18 yaml training Configs
+
+task:
+  type: &task_type "VPR"
+  name: "resnet18-amsoftmax"
+  export_path: "tasks/debug"
+
+dataset:
+  train_data: "sample_data/vpr_train_data.json"
+  eval_data: "sample_data/vpr_eval_data.json"
+  noise_data: "sample_data/noise_data.json"
+  batch_size: 32
+  num_workers: 4
+  chunk_size: 300
+  num_classes: &num_classes 10
+  
+  feat_type: "fbank"
+  feat_config:
+    num_mel_bins: &feat_dim 64
+    frame_length: 25
+    frame_shift: 10
+    dither: 0.0
+    samplerate: 16000
+
+  add_noise_proportion: 0.6 # Control noisify augmention ratio
+  add_noise_config:
+    min_snr_db: 10
+    max_snr_db: 50
+    max_gain_db: 300.0
+
+embedding_model:
+  model: "ResNet"
+  config:
+    feats_dim: *feat_dim
+    block_type: "BasicBlock"
+    num_blocks: [2, 2, 2, 2]
+    in_channels: 32
+    embedding_dims: [256]
+
+loss:
+  model: "AM-Softmax" 
+  config:
+    embedding_dim: 256 
+    num_classes: *num_classes 
+    scale_factor: 30.0
+    margin: 0.4
+
+metric:
+  config:
+    task: *task_type 
+    top_ks: [1, 5]
+
+optim_setup: 
+  optimizer:
+    type: "Adam" 
+    config:
+      lr: 0.001
+  lr_scheduler:
+    type: "Cosine_Annealing"
+    config:
+      T_max: 50000
+    step_config: 
+      interval: "step" # Default API of configure_optimizers
+      frequency: 5  # Default API of configure_optimizers
+
+# ----- "Warmup" ------
+# lr_scheduler:
+#   type: "Warmup" 
+#   config:
+#     warmup_steps: 20000 
+#     step_config:
+#       interval: "step"
+#       frequency: 5
+
+# ----- "ReduceLROnPlateau" -----
+# lr_scheduler:
+#   type: "ReduceLROnPlateau"
+#   config:
+#     mode: "min"
+#     factor: 0.5
+#   step_config: 
+#     monitor: "val_loss" # Default API of configure_optimizers
+#     frequency: 1  # Default API of configure_optimizers
+
+trainer:
+  accelerator: "cpu" 
+  devices: 1 
+  strategy: "ddp" 
+  amp_backend: "native" 
+  precision: 32
+  max_epochs: 2000
+
+callbacks:
+  model_chkpt_config:
+    monitor: "top_1_acc"
+    mode: "max"
+    save_top_k: 10
+
+finetune:
+  base_model: null 
+resume: null
