@@ -19,6 +19,7 @@ from pytorch_lightning import loggers as pl_loggers
 
 import callbacks.callbacks as callbacks
 from vpr_task import VprTask
+from vad_task import VadTask
 
 FLAGS = gflags.FLAGS
 
@@ -30,6 +31,7 @@ gflags.DEFINE_string("config_path", "config/training/resnet.yaml",
 class TaskFactory(Enum):
     """ Task Factory, build selected task from config """
     VPR = VprTask
+    VAD = VadTask
 
 
 def run_task():
