@@ -2,7 +2,7 @@
 
 task:
   type: &task_type "VPR"
-  name: "resnet18-amsoftmax"
+  name: "ecapatdnn-amsoftmax"
   export_path: "tasks/debug"
 
 dataset:
