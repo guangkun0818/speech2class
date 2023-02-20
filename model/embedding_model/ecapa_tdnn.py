@@ -36,6 +36,12 @@ class EcapaTdnn(nn.Module):
             savedir="pretrained_models/spkrec-ecapa-voxceleb"
         ).mods["embedding_model"]
 
+        self._activate_params()  # Activate frozen params
+
+    def _activate_params(self):
+        for key, params in self.named_parameters():
+            params.requires_grad = True
+
     def forward(self, feats: torch.Tensor) -> torch.Tensor:
         """ Training graph """
         return self._embedding_model(feats).squeeze(
