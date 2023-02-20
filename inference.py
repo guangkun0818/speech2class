@@ -59,6 +59,8 @@ class VadInference(VadTask):
         """ Testdataloader Impl """
         dataset = VadTestDataset(self._test_data, self._frontend_model)
         # TODO: Fix frontend.script conflict with num_works > 1
+        # This happends when "ddp_spawn" specified, which should replace with "ddp".
+        # However, MacBook seems only ddp_spawn supported.
         dataloader = DataLoader(
             dataset=dataset,
             batch_size=1)  # only support batch_size = 1 currently
