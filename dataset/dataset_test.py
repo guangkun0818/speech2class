@@ -110,7 +110,7 @@ class VadDatasetTest(unittest.TestCase):
         self._test_config = {"test_data": "sample_data/vad_eval_data.json"}
         self._vad_test_dataset = VadTestDataset(
             dataset_json=self._test_config["test_data"],
-            frontend="sample_data/model/frontend.script")
+            frontend="sample_data/model/demo_task/frontend.script")
 
     def test_vad_train_dataset(self):
         # Unittest of train dataset
