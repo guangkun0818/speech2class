@@ -58,8 +58,10 @@ class VadInference(VadTask):
     def test_dataloader(self):
         """ Testdataloader Impl """
         dataset = VadTestDataset(self._test_data, self._frontend_model)
+        # TODO: Fix frontend.script conflict with num_works > 1
         dataloader = DataLoader(
-            dataset=dataset, batch_size=1)  # only support batch_size = 1 currently
+            dataset=dataset,
+            batch_size=1)  # only support batch_size = 1 currently
         return dataloader
 
     def test_step(self, batch, batch_idx):
