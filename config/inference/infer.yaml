@@ -1,0 +1,14 @@
+# Inference of Vad task
+
+test_data: "sample_data/vad_eval_data.json"
+result_path: "test_logs/debug"
+
+task_config: "sample_data/model/demo_task/crdnn.yaml"
+chkpt_name: "crdnn.ckpt"
+
+post_process: []
+
+trainer:
+  accelerator: "cpu" 
+  devices: 1 
+  strategy: "ddp" 
