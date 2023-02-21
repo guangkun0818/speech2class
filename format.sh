@@ -10,8 +10,8 @@
 find ./ -path "./runtime" -prune -o -iname "*.py" -print | xargs yapf -i --style google
 
 # C++ runtime clang-format 13.0.0
-find ./runtime/vad_rt -iname "*.h" -o -iname "*.cc" -o -iname "*.cpp" | xargs clang-format -style=Google -i
+find ./runtime/vad_rt/ -iname "*.h" -o -iname "*.cc" -o -iname "*.cpp" | xargs clang-format -style=Google -i
 
 # CMakes cmake-format version 0.6.13
-find ./runtime/cmake -iname "*.cmake" | xargs cmake-format -i
+find ./runtime/cmake/ -iname "*.cmake" | xargs cmake-format -i
 find ./runtime/ -path "./runtime/3rd_party" -prune -o -iname "CMakeLists.txt" -print | xargs cmake-format -i
