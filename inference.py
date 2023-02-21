@@ -62,8 +62,8 @@ class VadInference(VadTask):
         # This happends when "ddp_spawn" specified, which should replace with "ddp".
         # However, MacBook seems only ddp_spawn supported.
         dataloader = DataLoader(
-            dataset=dataset,
-            batch_size=1)  # only support batch_size = 1 currently
+            dataset=dataset, batch_size=1,
+            num_workers=4)  # only support batch_size = 1 currently
         return dataloader
 
     def test_step(self, batch, batch_idx):
