@@ -7,4 +7,4 @@ set(LIBTORCH_URL
 FetchContent_Declare(libtorch URL ${LIBTORCH_URL})
 FetchContent_MakeAvailable(libtorch)
 find_package(Torch REQUIRED PATHS ${libtorch_SOURCE_DIR} NO_DEFAULT_PATH)
-set(CMAKE_CXX_FLAGS " ${TORCH_CXX_FLAGS} -fPIC -DC10 USE_GLOG")
+set(CMAKE_CXX_FLAGS " ${TORCH_CXX_FLAGS} -fPIC -DC10_USE_GLOG")

@@ -1,4 +1,4 @@
-# GoogleTest
+# GoogleTest v1.13.0
 FetchContent_Declare(
   googletest
   GIT_REPOSITORY https://github.com/google/googletest.git

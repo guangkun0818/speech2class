@@ -1,0 +1,6 @@
+{
+    "frontend": "sample_data/model/demo_task/frontend.script",
+    "vad_model": "sample_data/model/crdnn_int8.script",
+    "threshold": 0.5,
+    "res_cache_capacity": 1
+}
