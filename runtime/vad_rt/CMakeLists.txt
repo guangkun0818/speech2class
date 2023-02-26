@@ -19,3 +19,8 @@ add_test(
   NAME vadsess_test
   COMMAND vadsess_test
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/..)
+
+# Build offline vad session
+add_executable(build_vad_sess build_vad_sess.cc utils/thread_pool.h
+                              utils/json.h)
+target_link_libraries(build_vad_sess vadsess_static glog gflags)
