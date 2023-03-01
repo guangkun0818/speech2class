@@ -56,8 +56,18 @@ void VadSession::ProcessPcms(const std::vector<float>& pcms) {
   // Concat pcm buffer with input pcms, update pcm_buffer.
   pcms_ready.insert(pcms_ready.end(), pcms.begin(), pcms.end());
 
-  // TODO: fix offset when input pcm has residual
-  int offset = std::min<int>(pcms_ready.size(), /*15ms*/ 240);
+  // Framing strategy:
+  // bound--------------------bound
+  //   |----25ms----|-10ms-|    |
+  //   |      |----25ms----|    |
+  //   |             |----25ms--|--|
+  // --------------------------------
+  // The last frame will be discard when frame shift beyond the bound of given
+  // pcms, therefore, pcm_buffer not only need to cache 240 samples (25ms -
+  // 10ms) but also residual of discarded pcms.
+  int resi_size = (pcms_ready.size() - 400) % 160;
+  int offset =
+      std::min<int>(pcms_ready.size(), /*15ms + residual*/ 240 + resi_size);
 
   session_state_->pcm_buffer.insert(session_state_->pcm_buffer.end(),
                                     pcms_ready.end() - offset,
