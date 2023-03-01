@@ -70,3 +70,27 @@ TEST_F(TestVadSession, TestSessionStreaming) {
 
   EXPECT_EQ(result.size(), 9998);
 }
+
+TEST_F(TestVadSession, TestSessionStreamingWithResidual) {
+  std::vector<int> result;
+  std::vector<int> chunk_result;
+  // 16123 samples, must have residual.
+  Tensor sample_wav = torch::rand({1, 16123}).contiguous();
+  std::vector<float> sample_pcms(
+      sample_wav.data_ptr<float>(),
+      sample_wav.data_ptr<float>() + sample_wav.numel());
+
+  vad_session->SessionStart();
+  for (int i = 0; i < 100; i++) {
+    // Simulated streaming session
+    vad_session->Process(sample_pcms);
+    chunk_result = vad_session->GetResults();
+    result.insert(result.end(), chunk_result.begin(), chunk_result.end());
+  }
+
+  vad_session->FinalizeSession();
+  chunk_result = vad_session->GetResults();
+  result.insert(result.end(), chunk_result.begin(), chunk_result.end());
+
+  EXPECT_EQ(result.size(), 10075);
+}
