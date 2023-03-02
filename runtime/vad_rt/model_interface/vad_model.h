@@ -22,10 +22,10 @@ using Tensor = torch::Tensor;
 
 class VadModel {
  public:
-  VadModel(const std::string& model_path, float threshold) {
+  VadModel(const std::string& model_path, float speech_thres) {
     TorchModule model = torch::jit::load(model_path);
     vad_model_ = std::make_shared<TorchModule>(std::move(model));
-    threshold_ = threshold;  // Threshold to determine is speech.
+    speech_thres_ = speech_thres;  // Threshold to determine is speech.
   }
 
   // Initallze vad model cache when VAD Session start.
@@ -53,12 +53,12 @@ class VadModel {
         logits
             .accessor</*type=float*/ float, /*dim=3*/ 3>();  // More efficient?
 
-    return accessor[0][0][1] > threshold_;  // Speech index=1
+    return accessor[0][0][1] > speech_thres_;  // Speech index=1
   }
 
  private:
   std::shared_ptr<TorchModule> vad_model_;
-  float threshold_;
+  float speech_thres_;
 };
 
 }  // namespace model_interface
