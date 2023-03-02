@@ -3,6 +3,7 @@
 // Created on 2023.02.25
 // Build Vad session, designed for algo offline test.
 
+#include <experimental/filesystem>
 #include <iostream>
 #include <mutex>
 #include <string>
@@ -23,6 +24,7 @@ DEFINE_string(export_path, "test_logs/engine_test/",
 DEFINE_int32(num_thread, 4, "Num of threads of offline vad session.");
 
 // Global resources for threading vad inference.
+namespace fs = std::experimental::filesystem;
 std::shared_ptr<vad_rt::VadSessionOpts> opts;
 std::shared_ptr<vad_rt::VadResource> vad_resource;
 std::mutex g_mutex;  // Beware that lock thread-non-safety parts
@@ -38,15 +40,16 @@ void LoadConf(const std::string& session_conf, JSON& conf) {
     conf_infos += line;
   }
   conf = JSON::Load(conf_infos);
-  CHECK(conf.hasKey("frontend"));
-  CHECK(conf.hasKey("vad_model"));
+  CHECK(conf.hasKey("frontend") && conf.hasKey("vad_model"));
   CHECK(conf.hasKey("threshold"));
   CHECK(conf.hasKey("res_cache_capacity"));
 }
 
 void LoadOpts(JSON& conf, const std::shared_ptr<VadSessionOpts>& opts) {
   opts->frontend_path = conf["frontend"].ToString();
+  CHECK(fs::exists(opts->frontend_path));
   opts->vad_model_path = conf["vad_model"].ToString();
+  CHECK(fs::exists(opts->vad_model_path));
   opts->threshold = conf["threshold"].ToFloat();
   opts->res_cache_capacity = conf["res_cache_capacity"].ToInt();
 }
@@ -82,7 +85,7 @@ class VadSessionOffline : public VadSession {
   Thread entrypoint of vad inference.
 */
 void VadInference(const std::pair<std::string, std::string>& wav_scp,
-                  std::string& export_path) {
+                  fs::path& export_path) {
   std::unique_ptr<VadSessionOffline> vad_sess(
       new VadSessionOffline(opts, vad_resource));
   LOG(INFO) << "Offline Vad session built.";
@@ -98,7 +101,7 @@ void VadInference(const std::pair<std::string, std::string>& wav_scp,
       torch::from_blob(vad_result.data(), vad_result.size(), torch::kInt32);
 
   // Result = "utt.vad"
-  std::string save_path = export_path + wav_scp.first + ".vad";
+  fs::path save_path = export_path / fs::path(wav_scp.first + ".vad");
   auto bytes = torch::jit::pickle_save(vad_result_t);
   std::ofstream vad_res_f(save_path, std::ios::out | std::ios::binary);
   vad_res_f.write(bytes.data(), bytes.size());
@@ -127,6 +130,7 @@ int main(int argc, char** argv) {
           conf["threshold"].ToFloat())));
 
   // Build vad session.
+  fs::path export_path = FLAGS_export_path;
   vad_rt::utils::ThreadPool thread_pool(FLAGS_num_thread);
   std::ifstream datamap(FLAGS_dataset_json);
   std::string line;
@@ -138,7 +142,7 @@ int main(int argc, char** argv) {
     auto wav_scp = std::make_pair(conf["utt"].ToString(),
                                   conf["audio_filepath"].ToString());
 
-    thread_pool.enqueue(vad_rt::VadInference, wav_scp, FLAGS_export_path);
+    thread_pool.enqueue(vad_rt::VadInference, wav_scp, export_path);
   }
 
   return 0;

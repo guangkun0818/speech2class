@@ -5,14 +5,16 @@ project(
   LANGUAGES CXX C
   VERSION 0.1)
 
-# libTorch requires C++14 at least
+# LibTorch requires C++14 at least
 set(CMAKE_CXX_STANDARD 17)
+link_libraries(stdc++fs) # for std::filesystem since using gcc 7.5
 
 include(CTest)
 
 include(FetchContent)
 set(FETCHCONTENT_QUIET off)
 set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/3rd_party")
+
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 include(gflags)
