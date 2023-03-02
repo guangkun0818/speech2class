@@ -41,8 +41,11 @@ void LoadConf(const std::string& session_conf, JSON& conf) {
   }
   conf = JSON::Load(conf_infos);
   CHECK(conf.hasKey("frontend") && conf.hasKey("vad_model"));
-  CHECK(conf.hasKey("threshold"));
-  CHECK(conf.hasKey("res_cache_capacity"));
+  CHECK(conf.hasKey("speech_thres"));
+  CHECK(conf.hasKey("post_process"));
+  CHECK(conf["post_process"].hasKey("do_post_process") &&
+        conf["post_process"].hasKey("window_size") &&
+        conf["post_process"].hasKey("switch_thres"));
 }
 
 void LoadOpts(JSON& conf, const std::shared_ptr<VadSessionOpts>& opts) {
@@ -50,8 +53,13 @@ void LoadOpts(JSON& conf, const std::shared_ptr<VadSessionOpts>& opts) {
   CHECK(fs::exists(opts->frontend_path));
   opts->vad_model_path = conf["vad_model"].ToString();
   CHECK(fs::exists(opts->vad_model_path));
-  opts->threshold = conf["threshold"].ToFloat();
-  opts->res_cache_capacity = conf["res_cache_capacity"].ToInt();
+  opts->speech_thres = conf["speech_thres"].ToFloat();
+
+  if (conf["post_process"]["do_post_process"].ToBool()) {
+    opts->do_post_process = conf["post_process"]["do_post_process"].ToBool();
+    opts->window_size = conf["post_process"]["window_size"].ToInt();
+    opts->switch_thres = conf["post_process"]["switch_thres"].ToFloat();
+  }
 }
 
 /*
@@ -63,6 +71,10 @@ class VadSessionOffline : public VadSession {
                              const std::shared_ptr<VadResource>& resource)
       : VadSession(opts, resource) {
     wav_reader_ = std::make_unique<frontend::WavReader>();
+    LOG_IF(INFO, this->do_post_process_)
+        << "Offline Vad session built, Post-process will be applied.";
+    LOG_IF(INFO, !this->do_post_process_)
+        << "Offline Vad session built, No Post-process specified.";
   }
 
   // Vad process through audio file.
@@ -127,7 +139,7 @@ int main(int argc, char** argv) {
   vad_resource =
       std::make_shared<vad_rt::VadResource>(std::move(vad_rt::VadResource(
           conf["frontend"].ToString(), conf["vad_model"].ToString(),
-          conf["threshold"].ToFloat())));
+          conf["speech_thres"].ToFloat())));
 
   // Build vad session.
   fs::path export_path = FLAGS_export_path;

@@ -15,7 +15,12 @@ VadSession::VadSession(const std::shared_ptr<VadSessionOpts>& opts,
   vad_model_ = resource->vad_model;
   feat_pipeline_ = resource->feats_extract;
   session_state_ = std::make_unique<SessionState>();
-  res_cache_capacity_ = opts->res_cache_capacity;
+  do_post_process_ = opts->do_post_process;
+  window_size_ = opts->window_size;
+  switch_thres_ = opts->switch_thres;
+
+  LOG_IF(INFO, do_post_process_) << "Window size: " << window_size_
+                                 << " Switch threshold: " << switch_thres_;
 }
 
 void VadSession::Reset() {
@@ -29,6 +34,14 @@ void VadSession::Reset() {
   while (!session_state_->results_cache.empty()) {
     session_state_->results_cache.pop();
   }
+  // Clear Check Window
+  while (!session_state_->check_window.empty()) {
+    session_state_->check_window.pop_front();
+  }
+  // Set speech not start
+  session_state_->has_speech_start = false;
+  // Reset speech_frames_count
+  session_state_->speech_f_count = 0;
 }
 
 void VadSession::SessionStart() {
@@ -38,10 +51,15 @@ void VadSession::SessionStart() {
 
 void VadSession::FinalizeSession() {
   // Export all cached results out, Reset Session.
-  while (!session_state_->results_cache.empty()) {
-    this->results_.push_back(
-        static_cast<bool>(session_state_->results_cache.front()));
-    session_state_->results_cache.pop();
+  while (!session_state_->check_window.empty()) {
+    if (session_state_->has_speech_start) {
+      // Speech has't end yet, still export as speech
+      this->results_.push_back(1);
+    } else {
+      // Speech has ended, export as non-speech
+      this->results_.push_back(0);
+    }
+    session_state_->check_window.pop_front();
   }
   Reset();
 }
@@ -94,27 +112,105 @@ void VadSession::ProcessPcms(const std::vector<float>& pcms) {
   }
 }
 
-void VadSession::PostProcess() { /* TODO(xiaoyue.yang@transsion.com) Impl
-                                    post-process */
+void VadSession::NoPostProcess() {
+  // No-post-processing
+  while (!session_state_->results_cache.empty()) {
+    this->results_.push_back(session_state_->results_cache
+                                 .front());  // Directly move to final result
+    session_state_->results_cache.pop();
+  }
 }
 
-void VadSession::FinalizeResults() {
-  // Pop out cached result if it reach predefined capacity of result_buffer.
+void VadSession::SlidingWindow() {
+  // ----- Sliding Window post-processing -----
 
   // This means the Vad session usually won't output result of current input
   // pcms immediately. Because most post-process of vad systems require infos
   // of both history and future to get final decision.
-  while (session_state_->results_cache.size() >= res_cache_capacity_) {
-    this->results_.push_back(
-        static_cast<bool>(session_state_->results_cache.front()));
+
+  // Sliding-Window check speech state from last time first, then update
+  // check_window states with current raw_output from vad_model.
+  while (!session_state_->results_cache.empty()) {
+    if (session_state_->has_speech_start == false &&
+        session_state_->check_window.size() == this->window_size_) {
+      // If speech has not started yet and the num of speech frames within
+      // check_window reach switch threshold (switch_thres * window_size), then
+      // start of speech and final result of all frames within check_window
+      // determined. Export the whole check_window as speech(result=1). This
+      // will regard several non-speech frames within check_window as speech.
+      if (session_state_->speech_f_count >
+          this->switch_thres_ * this->window_size_) {
+        // Speech start detected, export whole check_window as speech
+        session_state_->has_speech_start = true;
+        for (int i = 0; i < session_state_->check_window.size(); i++) {
+          this->results_.push_back(1);
+        }
+        session_state_->check_window.clear();  // Clear check_window
+        session_state_->speech_f_count = 0;    // Clear speech frames count
+
+      } else {
+        this->results_.push_back(
+            0);  // Speech has not started, non-speech maintained.
+      }
+    } else if (session_state_->has_speech_start == true &&
+               session_state_->check_window.size() == this->window_size_) {
+      int non_speech_f_count =
+          session_state_->check_window.size() - session_state_->speech_f_count;
+      // If speech has started and the num of non-speech frames within
+      // check_window reach switch threshold (switch_thres * window_size), then
+      // end of speech and final result of all frames within check_window
+      // determined. Export the whole check_window as speech(result=0). This
+      // will discard several speech frames within check_window as non-speech.
+      if (non_speech_f_count > this->switch_thres_ * this->window_size_) {
+        // TODO: consider the check_window as non-speech or speech when speech
+        // end detected? Speech end detected, export whole check_windo as
+        // non-speech
+        session_state_->has_speech_start = false;
+        for (int i = 0; i < session_state_->check_window.size(); i++) {
+          this->results_.push_back(0);
+        }
+        session_state_->check_window.clear();  // Clear check_window
+        session_state_->speech_f_count = 0;    // Clear speech frames count
+
+      } else {
+        this->results_.push_back(1);  // Final result, speech has not ended.
+      }
+    }
+
+    // Update sliding-window states with current raw_output from vad pipeline.
+    int raw_is_speech = session_state_->results_cache.front();
     session_state_->results_cache.pop();
+    UpdateCheckWindow(raw_is_speech);
+  }
+}
+
+void VadSession::UpdateCheckWindow(const int& is_speech) {
+  // Push cache results into check_window.
+  if (session_state_->check_window.size() < this->window_size_) {
+    session_state_->check_window.push_back(is_speech);
+    // If raw output is speech, is_speech = 1, update speech_f_count
+    session_state_->speech_f_count += is_speech;
+  } else {
+    // Update speech_f_count if check_window reach its capacity
+    session_state_->speech_f_count -= session_state_->check_window.front();
+    session_state_->check_window.pop_front();
+    session_state_->check_window.push_back(is_speech);
+    session_state_->speech_f_count += is_speech;
+  }
+}
+
+void VadSession::PostProcess() {
+  // Post-process interface
+  if (this->do_post_process_) {
+    SlidingWindow();
+  } else {
+    NoPostProcess();
   }
 }
 
 void VadSession::Process(const std::vector<float>& pcms) {
   ProcessPcms(pcms);
   PostProcess();
-  FinalizeResults();
 }
 
 }  // namespace vad_rt
