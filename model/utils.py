@@ -46,6 +46,13 @@ class Metric(object):
         # ACC of top_k
         return num_matched / batch_size
 
+    @classmethod
+    def vad_infer_metrics(cls, preds: torch.Tensor, labels: torch.Tensor):
+        # Interface for inference metrics
+        acc = cls._vad_accuarcy(cls, preds=preds, labels=labels)
+        far, frr = cls._vad_far_frr(cls, preds=preds, labels=labels)
+        return {"acc": acc, "far": far, "frr": frr}
+
     def _vad_accuarcy(self,
                       preds: torch.Tensor,
                       labels: torch.Tensor,
@@ -61,6 +68,18 @@ class Metric(object):
 
         # ACC num_matched_frames / total frame within a batch
         return num_matched / labels.numel()
+
+    def _vad_far_frr(self, preds: torch.Tensor, labels: torch.Tensor):
+        # False Accept Rate:
+        #   Prediction 1 (speech) / Ground_truth 0 (non-speech)
+        # False Reject Rate:
+        #   Prediction 0 (non-speech) / Ground_truth 1 (speech)
+        pred_labels = torch.argmax(preds, dim=-1)
+        torch_sub = torch.sub(pred_labels, labels)
+
+        fa_matched = torch.eq(torch_sub, 1).sum(dim=1).sum().float()
+        fr_matched = torch.eq(torch_sub, -1).sum(dim=1).sum().float()
+        return fa_matched / labels.numel(), fr_matched / labels.numel()
 
     def __call__(self, preds: torch.Tensor, labels: torch.Tensor):
         """ Call of Metrics func """
