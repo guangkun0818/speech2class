@@ -154,6 +154,7 @@ class VadDatasetTest(unittest.TestCase):
         dataloader = DataLoader(dataset=self._vad_test_dataset, batch_size=1)
         for i, batch in enumerate(dataloader):
             count += 1
+            glog.info("Utt is {}.".format(batch["utt"]))
             glog.info("Feats size {}.".format(batch["feat"].shape))
             glog.info("Labels size {}.".format(batch["label"].shape))
 

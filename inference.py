@@ -3,6 +3,7 @@
 # Created on 2023.02.19
 """ Inference of Both Vad and Vpr tasks """
 
+import collections
 import os
 import sys
 import gflags
@@ -13,10 +14,11 @@ import torch
 import shutil
 import yaml
 
+import torch.nn.functional as F
 import pytorch_lightning as pl
 
 from enum import Enum, unique
-from typing import List
+from typing import List, Dict
 from torch.utils.data import DataLoader
 
 from dataset.dataset import VadTestDataset
@@ -41,39 +43,79 @@ class VadInference(VadTask):
         # Inference Initialize
         super(VadInference, self).__init__(config=task_config)
 
+        # Export path of vad model, quantized torchscript
+        self._export_quant_model = infer_config["export_quant_model"]
+        self._model_export_path = infer_config["result_path"]
+
         self._test_data = infer_config["test_data"]
         # Load torchscript frontend
         self._frontend_model = os.path.join(task_config["task"]["export_path"],
                                             "frontend.script")
-        # TODO: Impl post_processing
-        self._post_process = self.post_process_factory(
+
+        self._post_process, self._post_process_config = self.post_process_factory(
             infer_config["post_process"])
 
-        self._acc = []  # Track down test acc
+        # Track down test acc
+        self._total_metrics = {"acc": [], "far": [], "frr": []}
 
-    def post_process_factory(self, config: List[str]):
-        # TODO: Return post_process method with given config like: ["sliding window"]
-        ...
+    @property
+    def device(self):
+        # Specify device for model export
+        return next(self._vad_model.parameters()).device.type
+
+    def export_quant_model(self):
+        # Vad model quantization and export
+        self._vad_model.vad_model.train(False)
+        model_quant = self._vad_model.vad_model
+
+        # Ops fuse
+        for layer_id in range(
+                self._vad_model.vad_model._cnn_blocks._num_layers):
+            model_quant = torch.quantization.fuse_modules(
+                model_quant, [
+                    "_cnn_blocks._cnn_layers.{}.0".format(layer_id),
+                    "_cnn_blocks._cnn_layers.{}.1".format(layer_id)
+                ])
+
+        # Dynamic quantize Linear and RNN layer
+        model_quant = torch.quantization.quantize_dynamic(
+            model_quant,  # the original model 
+            {torch.nn.Linear, torch.nn.GRU, torch.nn.LSTM
+            },  # a set of layers to dynamically quantize 
+            dtype=torch.qint8)
+
+        vad_model_int8 = torch.jit.script(model_quant)
+
+        vad_model_int8.save(
+            os.path.join(
+                self._model_export_path,
+                "{}_int8.script".format(model_quant.__class__.__name__)))
 
     def test_dataloader(self):
         """ Testdataloader Impl """
         dataset = VadTestDataset(self._test_data, self._frontend_model)
-        # TODO: Fix frontend.script conflict with num_works > 1
-        # This happends when "ddp_spawn" specified, which should replace with "ddp".
-        # However, MacBook seems only ddp_spawn supported.
+        # frontend.script conflict with num_works > 1. This happends when "ddp_spawn"
+        # specified, which should replace with "ddp". However, MacBook seems only
+        # ddp_spawn supported.
         dataloader = DataLoader(
             dataset=dataset, batch_size=1,
             num_workers=4)  # only support batch_size = 1 currently
         return dataloader
 
-    def test_step(self, batch, batch_idx):
-        # Inference in streaming mode, simulated
+    def post_process_factory(self, config: Dict):
+        # Return post_process method with given config like: ["sliding window"]
+        # config should be consist with method name.
+        return getattr(self, config["type"]), config["config"]
+
+    def no_post_process(self, batch, dummy_conf=None):
+        # No-post-processing, return with raw model output
         stream_output = []  # Streaming output pool
 
         feat = batch["feat"]
         cache = self._vad_model.initialize_cache()
 
         feat_len = batch["feat"].shape[1]
+        # Inference in streaming mode, simulated
         for frame_id in range(0, feat_len, 1):
             # Simulate streaming inference
             logits, cache = self._vad_model.inference(
@@ -81,12 +123,103 @@ class VadInference(VadTask):
             stream_output.append(logits)
         predictions = torch.concat(stream_output, dim=1)
 
-        metrics = self._metric(predictions, batch["label"])
-        glog.info(metrics)
-        self._acc.append(metrics["acc"])
+        return predictions
+
+    def sliding_window(self, batch, window_size=10, thres=0.7, max_len=100):
+        """ Inference with sliding_window post process
+            Args:
+                window_size: the length of ring_buffer
+                thres: when the ratio of the number of speech/non-speech over 
+                       window_size is greater than thres, confirm onset(offset)
+                max_len: if the length of speech is longer than max_len, 
+                         truncate it in advance.
+        """
+        post_process_output = []
+
+        has_speech_start = False  # Has speech started yet? work as switch
+        ring_buffer = collections.deque(maxlen=window_size)
+
+        feat = batch["feat"]
+        cache = self._vad_model.initialize_cache()
+
+        feat_len = batch["feat"].shape[1]
+        # Inference in streaming mode, simulated
+        for frame_id in range(0, feat_len, 1):
+            # Simulate streaming inference
+            logits, cache = self._vad_model.inference(
+                feat[:, frame_id:frame_id + 1, :], cache)
+
+            pred_label = torch.argmax(logits, dim=-1, keepdim=True)
+            post_process_output.append(torch.zeros(1, 1, 1))
+
+            if not has_speech_start:
+                # If speech has not started yet, wait for the onset status to appear
+                ring_buffer.append(pred_label)
+                num_speech_fs = ring_buffer.count(1)
+                if num_speech_fs > window_size * thres:
+                    onset = frame_id - len(ring_buffer)
+                    has_speech_start = True
+                    ring_buffer.clear()
+            else:
+                # If speech has started, wait for the offset status to appear
+                ring_buffer.append(pred_label)
+                num_non_speech_fs = ring_buffer.count(0)
+                if num_non_speech_fs > window_size * thres:
+                    offset = frame_id - window_size
+                    has_speech_start = False
+                    ring_buffer.clear()
+                    for i in range(onset, offset):
+                        post_process_output[i] = torch.ones(1, 1, 1)
+                elif frame_id - onset > max_len:
+                    # If speech duration longer than max_len, truncate it in advance
+                    for i in range(onset, frame_id):
+                        post_process_output[i] = torch.ones(1, 1, 1)
+                    onset = frame_id
+        if has_speech_start:
+            # If there is no offset until the end of the audio
+            # set the status from onset to the end of audio as speech(1)
+            for i in range(onset, feat_len):
+                post_process_output[i] = torch.ones(1, 1, 1)
+
+        predictions = torch.concat(post_process_output, dim=1).squeeze(-1)
+        predictions = F.one_hot(
+            predictions.to(device=feat.device).to(dtype=torch.int64))
+
+        return predictions
+
+    def test_step(self, batch, batch_idx):
+        # Return result with given post-process.
+        predictions = self._post_process(batch, **self._post_process_config)
+
+        batch_metrics = self._metric.vad_infer_metrics(predictions,
+                                                       batch["label"])
+        glog.info("{}: acc: {:.3f} far: {:.3f} frr: {:.3f}".format(
+            batch["utt"][0], batch_metrics["acc"] * 100,
+            batch_metrics["far"] * 100, batch_metrics["frr"] * 100))
+
+        for met_t in batch_metrics:
+            assert met_t in self._total_metrics
+            self._total_metrics[met_t].append(batch_metrics[met_t])
+
+    def on_test_start(self) -> None:
+        # If export_quant_model is specified, export torchscript model for deploy
+        if self._export_quant_model:
+            # Model should move to CPU for export
+            if self.device == "cuda":
+                self._vad_model.cpu()
+                self.export_quant_model()
+                self._vad_model.cuda()
+            else:
+                self.export_quant_model()
 
     def on_test_end(self) -> None:
-        glog.info("Total Acc: {}".format(sum(self._acc) / len(self._acc)))
+        num_testcases = len(self._total_metrics["acc"])
+
+        glog.info("Total ACC: {:.3f} FAR: {:.3f} FRR: {:.3f}".format(
+            sum(self._total_metrics["acc"]) / num_testcases * 100,
+            sum(self._total_metrics["far"]) / num_testcases * 100,
+            sum(self._total_metrics["frr"]) / num_testcases * 100,
+        ))
 
 
 @unique

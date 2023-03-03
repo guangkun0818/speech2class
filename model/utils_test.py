@@ -53,6 +53,17 @@ class TestMetrics(unittest.TestCase):
         acc = self._vad_metrics(preds, label)
         self.assertDictEqual(acc, {"acc": acc_true_value})
 
+    @parameterized.expand([
+        (torch.Tensor([[0, 0, 1, 1, 1]]),
+         torch.Tensor([[[0.4498, 0.7822], [0.6885, 0.3769], [0.6885, 0.3769],
+                        [0.6885, 0.3769], [0.4498, 0.7822]]]), 0.2, 0.4),
+    ])
+    def test_metrics_vad_far_frr(self, labels, preds, far_t, frr_t):
+        # Unittest of FAR FRR.
+        far, frr = self._vad_metrics._vad_far_frr(preds=preds, labels=labels)
+        self.assertEqual(far, far_t)
+        self.assertEqual(frr, frr_t)
+
 
 if __name__ == "__main__":
     unittest.main()
