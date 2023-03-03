@@ -22,8 +22,9 @@ class TestVadSessionSlidingWindow : public ::testing::Test {
     opts->speech_thres = 0.5;  // speech > threshold
 
     opts->do_post_process = true;  // Post-process specified
-    opts->window_size = 10;
-    opts->switch_thres = 0.7;
+    opts->window_size = 30;
+    opts->speech_start_thres = 0.5;
+    opts->speech_end_thres = 0.9;
 
     vad_resource = std::make_shared<VadResource>(VadResource(
         opts->frontend_path, opts->vad_model_path, opts->speech_thres));

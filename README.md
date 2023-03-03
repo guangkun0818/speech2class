@@ -27,6 +27,23 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python build_task.py \
 ```
 
 ## Formatted
+`format.sh` will format your `Python`, `cmake` and `C++` codes, if other language involved, please add format scripts of it.
 ```bash
-find ./ -path "./runtime" -prune -o -iname "*.py" -print | xargs yapf -i --style google
+bash format.sh
+```
+
+## Vad process
+Build Vad system runtime.
+```bash
+cd runtime/ && mkdir build && cd build/
+cmake .. && make -j 4
+```
+Post process with `SlidingWindow` is available, if Vad system works right before Asr, it should encourage speech easily start and hardly end covering enough infos for Asr by setting lower `speech_start_thres` and higher `speech_end_thres` respectively.
+```JSON
+"post_process": {
+  "do_post_process": true,
+  "window_size": 30,
+  "speech_start_thres": 0.5,
+  "speech_end_thres": 0.9
+}
 ```

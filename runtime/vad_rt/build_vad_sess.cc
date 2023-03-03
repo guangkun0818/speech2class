@@ -45,7 +45,8 @@ void LoadConf(const std::string& session_conf, JSON& conf) {
   CHECK(conf.hasKey("post_process"));
   CHECK(conf["post_process"].hasKey("do_post_process") &&
         conf["post_process"].hasKey("window_size") &&
-        conf["post_process"].hasKey("switch_thres"));
+        conf["post_process"].hasKey("speech_start_thres") &&
+        conf["post_process"].hasKey("speech_end_thres"));
 }
 
 void LoadOpts(JSON& conf, const std::shared_ptr<VadSessionOpts>& opts) {
@@ -58,7 +59,9 @@ void LoadOpts(JSON& conf, const std::shared_ptr<VadSessionOpts>& opts) {
   if (conf["post_process"]["do_post_process"].ToBool()) {
     opts->do_post_process = conf["post_process"]["do_post_process"].ToBool();
     opts->window_size = conf["post_process"]["window_size"].ToInt();
-    opts->switch_thres = conf["post_process"]["switch_thres"].ToFloat();
+    opts->speech_start_thres =
+        conf["post_process"]["speech_start_thres"].ToFloat();
+    opts->speech_end_thres = conf["post_process"]["speech_end_thres"].ToFloat();
   }
 }
 
