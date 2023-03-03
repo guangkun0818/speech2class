@@ -381,7 +381,7 @@ class VadTestDataset(BaseDataset):
             glog.check_eq(feat.shape[0], label.shape[0])
 
         # Chunk split exluded.
-        return {"feat": feat, "label": label}
+        return {"utt": data["audio_filepath"], "feat": feat, "label": label}
 
 
 def collate_fn(raw_batch):

@@ -6,7 +6,19 @@ result_path: "test_logs/debug"
 task_config: "sample_data/model/demo_task/crdnn.yaml"
 chkpt_name: "crdnn.ckpt"
 
-post_process: []
+export_quant_model: true
+post_process: 
+  type: "sliding_window" # no_post_process also available
+  config:
+    window_size: 10
+    thres: 0.7
+    max_len: 100
+
+# --- no_post_process config ---
+# post_process: 
+#   type: "no_post_process" # no_post_process also available
+#   config:
+#     dummy_conf: -1
 
 trainer:
   accelerator: "cpu" 
