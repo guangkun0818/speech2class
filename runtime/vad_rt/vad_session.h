@@ -20,12 +20,13 @@ namespace vad_rt {
 using Tensor = torch::Tensor;
 
 struct VadSessionOpts {
-  std::string frontend_path;     // frontend.script path
-  std::string vad_model_path;    // vad_model.script path
-  float speech_thres;            // Threshold of logits determining speech.
-  bool do_post_process = false;  // Specify whether do post-process
-  size_t window_size = -1;       // Check-window size of post-process
-  float switch_thres = -1;       // Speech start end transit threshold
+  std::string frontend_path;      // frontend.script path
+  std::string vad_model_path;     // vad_model.script path
+  float speech_thres;             // Threshold of logits determining speech.
+  bool do_post_process = false;   // Specify whether do post-process
+  size_t window_size = -1;        // Check-window size of post-process
+  float speech_start_thres = -1;  // Speech start transit threshold
+  float speech_end_thres = -1;    // Speech end transit threshold
 
   // TODO: More configs.
 };
@@ -121,7 +122,8 @@ class VadSession {
 
   // Config related with post-process
   size_t window_size_;
-  float switch_thres_;
+  float speech_start_thres_;
+  float speech_end_thres_;
 };
 
 }  // namespace vad_rt

@@ -17,10 +17,13 @@ VadSession::VadSession(const std::shared_ptr<VadSessionOpts>& opts,
   session_state_ = std::make_unique<SessionState>();
   do_post_process_ = opts->do_post_process;
   window_size_ = opts->window_size;
-  switch_thres_ = opts->switch_thres;
+  speech_start_thres_ = opts->speech_start_thres;
+  speech_end_thres_ = opts->speech_end_thres;
 
-  LOG_IF(INFO, do_post_process_) << "Window size: " << window_size_
-                                 << " Switch threshold: " << switch_thres_;
+  LOG_IF(INFO, do_post_process_)
+      << "Window size: " << window_size_
+      << " Speech start threshold: " << speech_start_thres_
+      << " Speech end threshold: " << speech_end_thres_;
 }
 
 void VadSession::Reset() {
@@ -127,19 +130,31 @@ void VadSession::SlidingWindow() {
   // This means the Vad session usually won't output result of current input
   // pcms immediately. Because most post-process of vad systems require infos
   // of both history and future to get final decision.
-
+  // ---------------------------------------------------------------------
+  // NOTE: Demo config of post-processing as follow, considering of Asr task as
+  // down-streaming task, Vad system should encourage speech easily start and
+  // hardly end covering enough infos for Asr by setting lower
+  // speech_start_thres and higher speech_end_thres respectively.
+  // "post_process": {
+  //    "do_post_process": true,
+  //    "window_size": 30,
+  //    "speech_start_thres": 0.5,
+  //    "speech_end_thres": 0.9
+  // }
+  // ----------------------------------------------------------------------
   // Sliding-Window check speech state from last time first, then update
   // check_window states with current raw_output from vad_model.
   while (!session_state_->results_cache.empty()) {
     if (session_state_->has_speech_start == false &&
         session_state_->check_window.size() == this->window_size_) {
       // If speech has not started yet and the num of speech frames within
-      // check_window reach switch threshold (switch_thres * window_size), then
-      // start of speech and final result of all frames within check_window
-      // determined. Export the whole check_window as speech(result=1). This
-      // will regard several non-speech frames within check_window as speech.
+      // check_window reach speech start threshold (speech_start_thres_ *
+      // window_size), then start of speech and final result of all frames
+      // within check_window determined. Export the whole check_window as
+      // speech(result=1). This will regard several non-speech frames within
+      // check_window as speech.
       if (session_state_->speech_f_count >
-          this->switch_thres_ * this->window_size_) {
+          this->speech_start_thres_ * this->window_size_) {
         // Speech start detected, export whole check_window as speech
         session_state_->has_speech_start = true;
         for (int i = 0; i < session_state_->check_window.size(); i++) {
@@ -157,17 +172,17 @@ void VadSession::SlidingWindow() {
       int non_speech_f_count =
           session_state_->check_window.size() - session_state_->speech_f_count;
       // If speech has started and the num of non-speech frames within
-      // check_window reach switch threshold (switch_thres * window_size), then
-      // end of speech and final result of all frames within check_window
-      // determined. Export the whole check_window as speech(result=0). This
-      // will discard several speech frames within check_window as non-speech.
-      if (non_speech_f_count > this->switch_thres_ * this->window_size_) {
-        // TODO: consider the check_window as non-speech or speech when speech
-        // end detected? Speech end detected, export whole check_windo as
-        // non-speech
+      // check_window reach speech end threshold (speech_end_thres *
+      // window_size), then end of speech and final result of all frames within
+      // check_window determined. Export the whole check_window as
+      // speech(result=1). This will still regard several non-speech frames
+      // within check_window as speech.
+      if (non_speech_f_count > this->speech_end_thres_ * this->window_size_) {
+        // Speech end detected, export whole check_window as speech
         session_state_->has_speech_start = false;
         for (int i = 0; i < session_state_->check_window.size(); i++) {
-          this->results_.push_back(0);
+          this->results_.push_back(
+              1);  // Export to final result, speech starting to end
         }
         session_state_->check_window.clear();  // Clear check_window
         session_state_->speech_f_count = 0;    // Clear speech frames count
