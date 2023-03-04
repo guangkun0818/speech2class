@@ -18,5 +18,6 @@ RUN pip install transformers==4.25.1
 RUN pip install speechbrain==0.5.13
 RUN pip install parameterized==0.8.1
 RUN pip install h5py==3.7.0
+RUN pip install onnxruntime==1.14.1
 
 CMD ["/bin/bash"]

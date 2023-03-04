@@ -124,7 +124,7 @@ class Conv1dCnnBlock(CnnBlockBase):
                       kernel_size=self._kernel_configs[layer_id],
                       stride=1,
                       dilation=self._dilation_config[layer_id],
-                      padding="valid"),
+                      padding=0),
             nn.BatchNorm1d(num_features=self._out_channels_config[layer_id]),
             nn.LeakyReLU()
         ]
@@ -215,7 +215,7 @@ class Conv2dCnnBlock(CnnBlockBase):
                       kernel_size=self._kernel_configs[layer_id],
                       stride=(1, self._stride_configs[layer_id]),
                       dilation=self._dilation_config[layer_id],
-                      padding="valid"),
+                      padding=0),
             nn.BatchNorm2d(num_features=self._out_channels_config[layer_id]),
             nn.LeakyReLU()
         ]
