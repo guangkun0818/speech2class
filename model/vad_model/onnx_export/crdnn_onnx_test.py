@@ -70,11 +70,12 @@ class TestCrdnnOnnxExport(unittest.TestCase):
         # Cache check
         for th_out, onnx_out in zip([*torch_output[0], *torch_output[1]],
                                     onnx_output):
-            torch.allclose(th_out, torch.Tensor(onnx_out))
+            self.assertTrue(torch.allclose(th_out, torch.Tensor(onnx_out)))
 
     def test_crdnn_infer_onnx_export(self):
         # Unittest of CrdnnOnnxInit export
         # Flatten feats + tuple(*caches) as the whole list with ["feats", "cache_0", ...]
+        self._crdnn_infer.train(False)
         input_names = ["feats"] + ["cache_%d" % i for i in range(5)]
         output_names = ["logits"] + ["next_cache_%d" % i for i in range(5)]
 
@@ -106,7 +107,11 @@ class TestCrdnnOnnxExport(unittest.TestCase):
 
         for th_out, onnx_out in zip(
             [torch_logits] + [*torch_cache[0], *torch_cache[1]], onnx_output):
-            torch.allclose(th_out, torch.Tensor(onnx_out))
+            self.assertTrue(
+                torch.allclose(th_out,
+                               torch.Tensor(onnx_out),
+                               atol=1e-7,
+                               rtol=1e-4))
 
 
 if __name__ == "__main__":
