@@ -157,7 +157,7 @@ class VadInference(VadTask):
                 ring_buffer.append(pred_label)
                 num_speech_fs = ring_buffer.count(1)
                 if num_speech_fs > window_size * thres:
-                    onset = frame_id - len(ring_buffer)
+                    onset = frame_id - len(ring_buffer) + 1
                     has_speech_start = True
                     ring_buffer.clear()
             else:
