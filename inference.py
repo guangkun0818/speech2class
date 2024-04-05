@@ -43,8 +43,9 @@ class VadInference(VadTask):
         # Inference Initialize
         super(VadInference, self).__init__(config=task_config)
 
-        # Export path of vad model, quantized torchscript
+        # Export path of vad model, quantized torchscript and onnx
         self._export_quant_model = infer_config["export_quant_model"]
+        self._export_onnx_model = infer_config["export_onnx_model"]
         self._model_export_path = infer_config["result_path"]
 
         self._test_data = infer_config["test_data"]
@@ -90,6 +91,48 @@ class VadInference(VadTask):
             os.path.join(
                 self._model_export_path,
                 "{}_int8.script".format(model_quant.__class__.__name__)))
+
+    def export_onnx_model(self, chunk_size):
+        # Cnn_cache: num_layers, Rnn_cache, 2.
+        num_cache = self._vad_model.vad_model._cnn_blocks._num_layers + 2
+        # Onnx vad export for on-device deploy
+        self._vad_model.vad_model.train(False)
+        model = self._vad_model.vad_model
+
+        # Export cache_init model.
+        model.forward = self._vad_model.vad_model.initialize_cache
+        # Onnx will flatten original cache into Tuple[cache_0, cache_1, ...]
+        output_names = ["cache_%d" % i for i in range(num_cache)]
+        init_model_path = os.path.join(
+            self._model_export_path,
+            "{}_init.onnx".format(model.__class__.__name__))
+
+        # Args is required by onnx export, set as empty for init
+        torch.onnx.export(model,
+                          args=(),
+                          f=init_model_path,
+                          verbose=True,
+                          input_names=None,
+                          output_names=output_names)
+
+        # Export inference model
+        model.forward = model.inference
+        dummy_feats = torch.rand(1, chunk_size, 64)
+        dummy_cache = model.initialize_cache()
+
+        input_names = ["feats"] + ["cache_%d" % i for i in range(num_cache)]
+        output_names = ["logits"
+                       ] + ["next_cache_%d" % i for i in range(num_cache)]
+        infer_model_path = os.path.join(
+            self._model_export_path,
+            "{}_inference.onnx".format(model.__class__.__name__))
+
+        torch.onnx.export(model,
+                          args=(dummy_feats, dummy_cache),
+                          f=infer_model_path,
+                          verbose=True,
+                          input_names=input_names,
+                          output_names=output_names)
 
     def test_dataloader(self):
         """ Testdataloader Impl """
@@ -211,6 +254,16 @@ class VadInference(VadTask):
                 self._vad_model.cuda()
             else:
                 self.export_quant_model()
+
+        # If export_onnx_model is specified, export onnx model for deploy
+        if self._export_onnx_model["do_export"]:
+            # Model should move to CPU for export
+            if self.device == "cuda":
+                self._vad_model.cpu()
+                self.export_onnx_model(self._export_onnx_model["chunk_size"])
+                self._vad_model.cuda()
+            else:
+                self.export_onnx_model(self._export_onnx_model["chunk_size"])
 
     def on_test_end(self) -> None:
         num_testcases = len(self._total_metrics["acc"])
