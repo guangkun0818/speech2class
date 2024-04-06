@@ -168,14 +168,21 @@ class VadInference(VadTask):
 
         return predictions
 
-    def sliding_window(self, batch, window_size=10, thres=0.7, max_len=100):
+    def sliding_window(self,
+                       batch,
+                       window_size=10,
+                       speech_start_thres=0.5,
+                       speech_end_thres=0.9) -> torch.Tensor:
         """ Inference with sliding_window post process
             Args:
-                window_size: the length of ring_buffer
-                thres: when the ratio of the number of speech/non-speech over 
-                       window_size is greater than thres, confirm onset(offset)
-                max_len: if the length of speech is longer than max_len, 
-                         truncate it in advance.
+                batch: Raw inference results from vad model.
+                window_size: the length of sliding window
+                speech_start_thres: threshold to detect speech start when 
+                                    has_speech_start is false.
+                speech_end_thres: threshold to detect speech start when 
+                                    has_speech_start is true.
+            return:
+                Frame-level smoothed prediction.
         """
         post_process_output = []
 
@@ -186,7 +193,6 @@ class VadInference(VadTask):
         cache = self._vad_model.initialize_cache()
 
         feat_len = batch["feat"].shape[1]
-        # Inference in streaming mode, simulated
         for frame_id in range(0, feat_len, 1):
             # Simulate streaming inference
             logits, cache = self._vad_model.inference(
@@ -195,29 +201,31 @@ class VadInference(VadTask):
             pred_label = torch.argmax(logits, dim=-1, keepdim=True)
             post_process_output.append(torch.zeros(1, 1, 1))
 
+            if len(ring_buffer) < window_size - 1:
+                # Keep filling in window if not full
+                ring_buffer.append(pred_label)
+                continue
+
             if not has_speech_start:
                 # If speech has not started yet, wait for the onset status to appear
                 ring_buffer.append(pred_label)
                 num_speech_fs = ring_buffer.count(1)
-                if num_speech_fs > window_size * thres:
-                    onset = frame_id - len(ring_buffer) + 1
+                if num_speech_fs > window_size * speech_start_thres:
+                    onset = frame_id - len(
+                        ring_buffer) + 1  # Front frame of the window
                     has_speech_start = True
                     ring_buffer.clear()
             else:
                 # If speech has started, wait for the offset status to appear
                 ring_buffer.append(pred_label)
                 num_non_speech_fs = ring_buffer.count(0)
-                if num_non_speech_fs > window_size * thres:
-                    offset = frame_id - window_size
+                if num_non_speech_fs > window_size * speech_end_thres:
+                    offset = frame_id  # End frame of the window
                     has_speech_start = False
                     ring_buffer.clear()
                     for i in range(onset, offset):
                         post_process_output[i] = torch.ones(1, 1, 1)
-                elif frame_id - onset > max_len:
-                    # If speech duration longer than max_len, truncate it in advance
-                    for i in range(onset, frame_id):
-                        post_process_output[i] = torch.ones(1, 1, 1)
-                    onset = frame_id
+
         if has_speech_start:
             # If there is no offset until the end of the audio
             # set the status from onset to the end of audio as speech(1)
