@@ -24,6 +24,7 @@ from torch.utils.data import DataLoader
 from dataset.dataset import VadTestDataset
 from vpr_task import VprTask
 from vad_task import VadTask
+from tools.model_average import model_average
 
 FLAGS = gflags.FLAGS
 
@@ -300,8 +301,6 @@ def inference():
 
     # Set up load and export path
     TASK_TYPE = task_config["task"]["type"]
-    CHKPT_PATH = os.path.join(task_config["task"]["export_path"], "checkpoints",
-                              infer_config["chkpt_name"])
     INFER_EXPORT_PATH = infer_config["result_path"]
 
     # Backup inference config and setup logging
@@ -318,6 +317,16 @@ def inference():
     glog.info(infer_config)
 
     # ----- Inference -----
+    if infer_config["chkpt_aver"] == True:
+        model_average(
+            os.path.join(task_config["task"]["export_path"], "checkpoints"))
+        CHKPT_PATH = os.path.join(task_config["task"]["export_path"],
+                                  "checkpoints", "averaged.chkpt")
+    else:
+        assert infer_config[
+            "chkpt_name"], "Please specify chkpt_name if chkpt_aver not applied."
+        CHKPT_PATH = os.path.join(task_config["task"]["export_path"],
+                                  "checkpoints", infer_config["chkpt_name"])
     task_inference = InferFactory[TASK_TYPE].value.load_from_checkpoint(
         CHKPT_PATH, task_config=task_config,
         infer_config=infer_config)  # Build from InferFactory
