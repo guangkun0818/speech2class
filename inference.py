@@ -24,6 +24,7 @@ from torch.utils.data import DataLoader
 from dataset.dataset import VadTestDataset
 from vpr_task import VprTask
 from vad_task import VadTask
+from tools.model_average import model_average
 
 FLAGS = gflags.FLAGS
 
@@ -43,8 +44,9 @@ class VadInference(VadTask):
         # Inference Initialize
         super(VadInference, self).__init__(config=task_config)
 
-        # Export path of vad model, quantized torchscript
+        # Export path of vad model, quantized torchscript and onnx
         self._export_quant_model = infer_config["export_quant_model"]
+        self._export_onnx_model = infer_config["export_onnx_model"]
         self._model_export_path = infer_config["result_path"]
 
         self._test_data = infer_config["test_data"]
@@ -91,6 +93,48 @@ class VadInference(VadTask):
                 self._model_export_path,
                 "{}_int8.script".format(model_quant.__class__.__name__)))
 
+    def export_onnx_model(self, chunk_size):
+        # Cnn_cache: num_layers, Rnn_cache, 2.
+        num_cache = self._vad_model.vad_model._cnn_blocks._num_layers + 2
+        # Onnx vad export for on-device deploy
+        self._vad_model.vad_model.train(False)
+        model = self._vad_model.vad_model
+
+        # Export cache_init model.
+        model.forward = self._vad_model.vad_model.initialize_cache
+        # Onnx will flatten original cache into Tuple[cache_0, cache_1, ...]
+        output_names = ["cache_%d" % i for i in range(num_cache)]
+        init_model_path = os.path.join(
+            self._model_export_path,
+            "{}_init.onnx".format(model.__class__.__name__))
+
+        # Args is required by onnx export, set as empty for init
+        torch.onnx.export(model,
+                          args=(),
+                          f=init_model_path,
+                          verbose=True,
+                          input_names=None,
+                          output_names=output_names)
+
+        # Export inference model
+        model.forward = model.inference
+        dummy_feats = torch.rand(1, chunk_size, 64)
+        dummy_cache = model.initialize_cache()
+
+        input_names = ["feats"] + ["cache_%d" % i for i in range(num_cache)]
+        output_names = ["logits"
+                       ] + ["next_cache_%d" % i for i in range(num_cache)]
+        infer_model_path = os.path.join(
+            self._model_export_path,
+            "{}_inference.onnx".format(model.__class__.__name__))
+
+        torch.onnx.export(model,
+                          args=(dummy_feats, dummy_cache),
+                          f=infer_model_path,
+                          verbose=True,
+                          input_names=input_names,
+                          output_names=output_names)
+
     def test_dataloader(self):
         """ Testdataloader Impl """
         dataset = VadTestDataset(self._test_data, self._frontend_model)
@@ -125,14 +169,21 @@ class VadInference(VadTask):
 
         return predictions
 
-    def sliding_window(self, batch, window_size=10, thres=0.7, max_len=100):
+    def sliding_window(self,
+                       batch,
+                       window_size=10,
+                       speech_start_thres=0.5,
+                       speech_end_thres=0.9) -> torch.Tensor:
         """ Inference with sliding_window post process
             Args:
-                window_size: the length of ring_buffer
-                thres: when the ratio of the number of speech/non-speech over 
-                       window_size is greater than thres, confirm onset(offset)
-                max_len: if the length of speech is longer than max_len, 
-                         truncate it in advance.
+                batch: Raw inference results from vad model.
+                window_size: the length of sliding window
+                speech_start_thres: threshold to detect speech start when 
+                                    has_speech_start is false.
+                speech_end_thres: threshold to detect speech start when 
+                                    has_speech_start is true.
+            return:
+                Frame-level smoothed prediction.
         """
         post_process_output = []
 
@@ -143,7 +194,6 @@ class VadInference(VadTask):
         cache = self._vad_model.initialize_cache()
 
         feat_len = batch["feat"].shape[1]
-        # Inference in streaming mode, simulated
         for frame_id in range(0, feat_len, 1):
             # Simulate streaming inference
             logits, cache = self._vad_model.inference(
@@ -152,29 +202,31 @@ class VadInference(VadTask):
             pred_label = torch.argmax(logits, dim=-1, keepdim=True)
             post_process_output.append(torch.zeros(1, 1, 1))
 
+            if len(ring_buffer) < window_size - 1:
+                # Keep filling in window if not full
+                ring_buffer.append(pred_label)
+                continue
+
             if not has_speech_start:
                 # If speech has not started yet, wait for the onset status to appear
                 ring_buffer.append(pred_label)
                 num_speech_fs = ring_buffer.count(1)
-                if num_speech_fs > window_size * thres:
-                    onset = frame_id - len(ring_buffer) + 1
+                if num_speech_fs > window_size * speech_start_thres:
+                    onset = frame_id - len(
+                        ring_buffer) + 1  # Front frame of the window
                     has_speech_start = True
                     ring_buffer.clear()
             else:
                 # If speech has started, wait for the offset status to appear
                 ring_buffer.append(pred_label)
                 num_non_speech_fs = ring_buffer.count(0)
-                if num_non_speech_fs > window_size * thres:
-                    offset = frame_id - window_size
+                if num_non_speech_fs > window_size * speech_end_thres:
+                    offset = frame_id  # End frame of the window
                     has_speech_start = False
                     ring_buffer.clear()
                     for i in range(onset, offset):
                         post_process_output[i] = torch.ones(1, 1, 1)
-                elif frame_id - onset > max_len:
-                    # If speech duration longer than max_len, truncate it in advance
-                    for i in range(onset, frame_id):
-                        post_process_output[i] = torch.ones(1, 1, 1)
-                    onset = frame_id
+
         if has_speech_start:
             # If there is no offset until the end of the audio
             # set the status from onset to the end of audio as speech(1)
@@ -212,6 +264,16 @@ class VadInference(VadTask):
             else:
                 self.export_quant_model()
 
+        # If export_onnx_model is specified, export onnx model for deploy
+        if self._export_onnx_model["do_export"]:
+            # Model should move to CPU for export
+            if self.device == "cuda":
+                self._vad_model.cpu()
+                self.export_onnx_model(self._export_onnx_model["chunk_size"])
+                self._vad_model.cuda()
+            else:
+                self.export_onnx_model(self._export_onnx_model["chunk_size"])
+
     def on_test_end(self) -> None:
         num_testcases = len(self._total_metrics["acc"])
 
@@ -239,8 +301,6 @@ def inference():
 
     # Set up load and export path
     TASK_TYPE = task_config["task"]["type"]
-    CHKPT_PATH = os.path.join(task_config["task"]["export_path"], "checkpoints",
-                              infer_config["chkpt_name"])
     INFER_EXPORT_PATH = infer_config["result_path"]
 
     # Backup inference config and setup logging
@@ -257,6 +317,16 @@ def inference():
     glog.info(infer_config)
 
     # ----- Inference -----
+    if infer_config["chkpt_aver"] == True:
+        model_average(
+            os.path.join(task_config["task"]["export_path"], "checkpoints"))
+        CHKPT_PATH = os.path.join(task_config["task"]["export_path"],
+                                  "checkpoints", "averaged.chkpt")
+    else:
+        assert infer_config[
+            "chkpt_name"], "Please specify chkpt_name if chkpt_aver not applied."
+        CHKPT_PATH = os.path.join(task_config["task"]["export_path"],
+                                  "checkpoints", infer_config["chkpt_name"])
     task_inference = InferFactory[TASK_TYPE].value.load_from_checkpoint(
         CHKPT_PATH, task_config=task_config,
         infer_config=infer_config)  # Build from InferFactory

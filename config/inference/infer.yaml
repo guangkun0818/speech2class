@@ -2,17 +2,21 @@
 
 test_data: "sample_data/vad_eval_data.json"
 result_path: "test_logs/debug"
-
 task_config: "sample_data/model/demo_task/crdnn.yaml"
-chkpt_name: "crdnn.ckpt"
+chkpt_name: null
+chkpt_aver: true
 
 export_quant_model: true
+export_onnx_model:
+  do_export: true
+  chunk_size: 10
+
 post_process: 
   type: "sliding_window" # no_post_process also available
   config:
     window_size: 10
-    thres: 0.7
-    max_len: 100
+    speech_start_thres: 0.5
+    speech_end_thres: 0.9
 
 # --- no_post_process config ---
 # post_process: 
@@ -21,6 +25,6 @@ post_process:
 #     dummy_conf: -1
 
 trainer:
-  accelerator: "cpu" 
+  accelerator: "gpu" 
   devices: 1 
   strategy: "ddp" 
