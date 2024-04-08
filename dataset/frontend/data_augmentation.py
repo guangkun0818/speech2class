@@ -69,3 +69,12 @@ def speed_perturb(pcm: torch.Tensor,
         return perturbed_pcm
     else:
         return pcm
+
+
+def volume_perturb(pcm: torch.Tensor, min_gain=1, max_gain=1) -> torch.Tensor:
+    """ Multiply the pcms with a gain perturbing volume (range from min_gain to max_gain) """
+    gain = random.uniform(min_gain, max_gain)
+    pcm_auged = pcm * gain
+    pcm_auged = torch.clamp(pcm_auged, min=-1,
+                            max=1)  # Clamp since pcm shall be normed.
+    return pcm_auged

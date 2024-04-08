@@ -101,6 +101,10 @@ class VadDatasetTest(unittest.TestCase):
                 "min_snr_db": 10,
                 "max_snr_db": 50,
                 "max_gain_db": 300.0,
+            },
+            "volume_perturb_config": {
+                "min_gain": 0.1,
+                "max_gain": 1.5
             }
         }
 
