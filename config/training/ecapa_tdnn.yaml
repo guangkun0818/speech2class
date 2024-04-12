@@ -73,12 +73,13 @@ optim_setup:
 #     frequency: 1  # Default API of configure_optimizers
 
 trainer:
-  accelerator: "cpu" 
+  accelerator: "gpu" 
   devices: 1 
   strategy: "ddp" 
-  amp_backend: "native" 
-  precision: 32
+  precision: "32-true"
   max_epochs: 2000
+  val_check_interval: 1.0
+  accumulate_grad_batches: 1
 
 callbacks:
   model_chkpt_config:
