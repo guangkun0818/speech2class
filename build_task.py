@@ -23,7 +23,7 @@ from vad_task import VadTask
 
 FLAGS = gflags.FLAGS
 
-gflags.DEFINE_string("config_path", "config/training/resnet.yaml",
+gflags.DEFINE_string("config_path", "config/training/resnet18.yaml",
                      "YAML configuration of Task")
 
 

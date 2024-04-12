@@ -27,25 +27,29 @@ dataset:
     min_snr_db: 10
     max_snr_db: 50
     max_gain_db: 300.0
+  
+  volume_perturb_config: 
+    min_gain: 0.1
+    max_gain: 1.5
 
 vad_model:
-  model: "Crdnn" 
+  model: "Crdnn" # Nano size, 16.9k params works fine.
   config:
     cnn_block_config:
-      num_layers: 3
+      num_layers: 2
       conv_type: "conv2d"
       input_dim: *feat_dim # should be consist with feat_dim 
-      in_channels_config: [1, 32, 32]
-      out_channels_config: [32, 32, 32] 
-      kernel_configs: [[3, 3], [5, 5], [3, 3]] 
-      stride_configs: [2, 2, 2]
-      dilation_config: [[1, 1], [2, 2], [1, 1]]
+      in_channels_config: [1, 16]
+      out_channels_config: [16, 16] 
+      kernel_configs: [[3, 3], [3, 3]] 
+      stride_configs: [2, 2]
+      dilation_config: [[1, 1], [1, 1]]
     dnn_block_config:
       num_layers: 1
-      hidden_dim: 64 
+      hidden_dim: 32
     rnn_block_config:
       rnn_type: "gru" 
-      hidden_size: 128
+      hidden_size: 32
       num_layers: 1
 
 loss:
@@ -91,12 +95,13 @@ optim_setup:
 #     frequency: 1  # Default API of configure_optimizers
 
 trainer:
-  accelerator: "cpu" 
+  accelerator: "gpu" 
   devices: 1 
   strategy: "ddp" 
-  amp_backend: "native" 
-  precision: 32
+  precision: "32-true"
   max_epochs: 2000
+  val_check_interval: 1.0
+  accumulate_grad_batches: 1
 
 callbacks:
   model_chkpt_config:

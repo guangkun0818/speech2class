@@ -234,6 +234,8 @@ class VadTrainDataset(BaseDataset):
         self._add_noise_proportion = config["add_noise_proportion"]
         self._add_noise_config = config["add_noise_config"]
         self._add_noise = data_augmentation.add_noise
+        self._volumn_perturb_config = config["volume_perturb_config"]
+        self._volumn_perturb = data_augmentation.volume_perturb
 
         if config["feat_type"] == "fbank":
             self._frontend = KaldiWaveFeature(**config["feat_config"])
@@ -267,6 +269,9 @@ class VadTrainDataset(BaseDataset):
             noise_pcm, _ = torchaudio.load(random.choice(self._noise_dataset),
                                            normalize=True)
             pcm = self._add_noise(pcm, noise_pcm, **self._add_noise_config)
+
+        # Volume perturb
+        pcm = self._volumn_perturb(pcm, **self._volumn_perturb_config)
 
         feat = self._frontend(pcm)
         label_info = data["label"]
