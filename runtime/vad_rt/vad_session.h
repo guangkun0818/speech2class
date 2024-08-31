@@ -81,6 +81,8 @@ class VadSession {
                       const std::shared_ptr<VadResource>& resource);
   VadSession(const VadSession&) = delete;
 
+  virtual ~VadSession(){};
+
   void SessionStart();
 
   // When session ends, export all cached results out
