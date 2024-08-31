@@ -23,6 +23,12 @@ class FrontendTest : public ::testing::Test {
 TEST_F(FrontendTest, ExtractorBuild) {
   // Frontend Script require 1.12.1 libtorch for ops support.
   EXPECT_NE(feat_extractor_->FrontendPtr(), nullptr);
+  EXPECT_EQ(feat_extractor_->FrameShift(), 10);
+  EXPECT_EQ(feat_extractor_->FrameLength(), 25);
+  EXPECT_EQ(feat_extractor_->SampleRate(), 16000);
+  EXPECT_EQ(feat_extractor_->FrameSamples(), 400);
+  EXPECT_EQ(feat_extractor_->NumChannel(), 1);
+  EXPECT_EQ(feat_extractor_->BitsPerSample(), 16);
 }
 
 TEST_F(FrontendTest, FeatureExtract) {

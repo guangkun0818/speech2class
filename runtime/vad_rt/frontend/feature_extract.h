@@ -31,11 +31,37 @@ class FeatureExtractor {
 
   const std::shared_ptr<TorchModule> FrontendPtr() const { return extractor_; }
 
+  const float FrameShift() const { return this->frame_shift_; };
+
+  const float FrameLength() const { return this->frame_length_; }
+
+  const int SampleRate() const { return this->sample_rate_; }
+
+  // Num of samples within frame.
+  const int FrameSamples() const {
+    return static_cast<int>(this->FrameLength() * this->SampleRate() / 1000);
+  }
+
+  // Num of samples within frame shift.
+  const int FrameShiftSamples() const {
+    return static_cast<int>(this->FrameShift() * this->SampleRate() / 1000);
+  }
+
+  const int NumChannel() const { return this->num_channel_; }
+
+  const int BitsPerSample() const { return this->bits_per_sample_; }
+
  private:
   // Load saved frontend torchscript model;
   void LoadModel(const std::string& frontend_path);
 
   std::shared_ptr<TorchModule> extractor_ = nullptr;
+
+  float frame_shift_ = 10;    // Frame shift of frontend, in ms.
+  float frame_length_ = 25;   // Frame length of frontend, in ms.
+  int sample_rate_ = 16000;   // Sample rate of frontend
+  int num_channel_ = 1;       // Mono
+  int bits_per_sample_ = 16;  // 16-bit Signed Integer
 };
 
 }  // namespace frontend

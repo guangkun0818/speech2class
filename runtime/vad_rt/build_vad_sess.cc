@@ -92,6 +92,45 @@ class VadSessionOffline : public VadSession {
     LOG(INFO) << audio_path << " Done.";
   }
 
+  void ExportProcessedAudio(const std::string& input_audio_path,
+                            const std::string& export_audio_path,
+                            const std::vector<int>& vad_results) {
+    // Read origin wave data.
+    wav_reader_->Open(input_audio_path);
+    LOG(INFO) << "Origin duration: "
+              << float(wav_reader_->num_samples()) / wav_reader_->sample_rate()
+              << "s.";
+
+    float* export_data = new float[wav_reader_->num_samples()];
+    int start = 0;
+    int end = start + this->feat_pipeline_->FrameSamples();
+    int num_export_samples = 0;
+
+    // Read sample with vad frame-level result = 1
+    for (auto frame_res : vad_results) {
+      if (frame_res) {
+        memcpy(/*export_pcm.end()=*/export_data + num_export_samples,
+               /*frame.start()=*/wav_reader_->data() + start,
+               /*num_frame_length=*/(end - start) * sizeof(float));
+        num_export_samples += (end - start);
+      }
+      start = std::max(end, start + this->feat_pipeline_->FrameShiftSamples());
+      end += this->feat_pipeline_->FrameShiftSamples();
+    }
+
+    auto wav_writer = frontend::WavWriter(
+        export_data, num_export_samples, this->feat_pipeline_->NumChannel(),
+        this->feat_pipeline_->SampleRate(),
+        this->feat_pipeline_->BitsPerSample());
+    wav_writer.Write(export_audio_path);
+
+    LOG(INFO) << "Duration after Vad: "
+              << float(num_export_samples) / this->feat_pipeline_->SampleRate()
+              << "s.";
+    LOG(INFO) << "Export audio processed by VAD to " << export_audio_path;
+    delete export_data;  // Free ptr.
+  }
+
  private:
   std::unique_ptr<frontend::WavReader> wav_reader_;
 };
@@ -110,6 +149,10 @@ void VadInference(const std::pair<std::string, std::string>& wav_scp,
   vad_sess->ProcessAudioFile(wav_scp.second);
   vad_sess->FinalizeSession();
   vad_result = vad_sess->GetResults();
+
+  // Export vad processed audio.
+  auto export_audio = export_path / fs::path(wav_scp.first + "_processed.wav");
+  vad_sess->ExportProcessedAudio(wav_scp.second, export_audio, vad_result);
 
   // Save results with torch::save as Tensor for metrics compute.
   Tensor vad_result_t =

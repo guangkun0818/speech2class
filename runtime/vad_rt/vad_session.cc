@@ -86,9 +86,12 @@ void VadSession::ProcessPcms(const std::vector<float>& pcms) {
   // The last frame will be discard when frame shift beyond the bound of given
   // pcms, therefore, pcm_buffer not only need to cache 240 samples (25ms -
   // 10ms) but also residual of discarded pcms.
-  int resi_size = (pcms_ready.size() - 400) % 160;
-  int offset =
-      std::min<int>(pcms_ready.size(), /*15ms + residual*/ 240 + resi_size);
+  int resi_size = (pcms_ready.size() - this->feat_pipeline_->FrameSamples()) %
+                  this->feat_pipeline_->FrameShiftSamples();
+  int frame_res = this->feat_pipeline_->FrameSamples() -
+                  this->feat_pipeline_->FrameShiftSamples();
+  int offset = std::min<int>(pcms_ready.size(),
+                             /*15ms + residual*/ frame_res + resi_size);
 
   session_state_->pcm_buffer.insert(session_state_->pcm_buffer.end(),
                                     pcms_ready.end() - offset,
