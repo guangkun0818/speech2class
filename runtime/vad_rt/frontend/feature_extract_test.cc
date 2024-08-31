@@ -27,7 +27,8 @@ TEST_F(FrontendTest, ExtractorBuild) {
   EXPECT_EQ(feat_extractor_->FrameLength(), 25);
   EXPECT_EQ(feat_extractor_->SampleRate(), 16000);
   EXPECT_EQ(feat_extractor_->FrameSamples(), 400);
-  EXPECT_EQ(feat_extractor_->FrameShiftSamples(), 160);
+  EXPECT_EQ(feat_extractor_->NumChannel(), 1);
+  EXPECT_EQ(feat_extractor_->BitsPerSample(), 16);
 }
 
 TEST_F(FrontendTest, FeatureExtract) {
