@@ -15,26 +15,25 @@ from model.vad_model.crdnn import CrdnnConfig, Crdnn
 
 
 class CrdnnOnnxInit(Crdnn):
-    """ Crdnn init for onnx export """
+  """ Crdnn init for onnx export """
 
-    def __init__(self, config: CrdnnConfig):
-        super(CrdnnOnnxInit, self).__init__(config)
+  def __init__(self, config: CrdnnConfig):
+    super(CrdnnOnnxInit, self).__init__(config)
 
-    def forward(self, dummy_input: torch.Tensor):
-        # Override original forward as initialize_cache
-        return self.initialize_cache()
+  def forward(self, dummy_input: torch.Tensor):
+    # Override original forward as initialize_cache
+    return self.initialize_cache()
 
 
 class CrdnnOnnxInference(Crdnn):
-    """ Crdnn Inference for onnx export """
+  """ Crdnn Inference for onnx export """
 
-    def __init__(self, config: CrdnnConfig):
-        super(CrdnnOnnxInference, self).__init__(config)
+  def __init__(self, config: CrdnnConfig):
+    super(CrdnnOnnxInference, self).__init__(config)
 
-    def forward(self, x: torch.Tensor, cache: Tuple[List[torch.Tensor],
-                                                    Tuple[torch.Tensor,
-                                                          torch.Tensor]]):
-        # Override original forward as inference
-        logits, next_cache = self.inference(x, cache)
+  def forward(self, x: torch.Tensor, cache: Tuple[List[torch.Tensor], Tuple[torch.Tensor,
+                                                                            torch.Tensor]]):
+    # Override original forward as inference
+    logits, next_cache = self.inference(x, cache)
 
-        return logits, next_cache
+    return logits, next_cache

@@ -8,5 +8,5 @@ from torch.nn.utils.rnn import pad_sequence
 
 
 def one_hot_encoding(spk_id, num_classes):
-    """ Encode the spk_id as One-Hot Encoding """
-    pass
+  """ Encode the spk_id as One-Hot Encoding """
+  pass
