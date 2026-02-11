@@ -12,58 +12,54 @@ from model.utils import Metric, MetricConfig
 
 
 class TestMetrics(unittest.TestCase):
-    """ Unittest of Metrics """
+  """ Unittest of Metrics """
 
-    def setUp(self) -> None:
-        vpr_config = {"task": "VPR", "top_ks": [1, 5]}
-        self._vpr_metrics = Metric(config=MetricConfig(**vpr_config))
-        vad_config = {"task": "VAD", "top_ks": None}
-        self._vad_metrics = Metric(config=MetricConfig(**vad_config))
+  def setUp(self) -> None:
+    vpr_config = {"task": "VPR", "top_ks": [1, 5]}
+    self._vpr_metrics = Metric(config=MetricConfig(**vpr_config))
+    vad_config = {"task": "VAD", "top_ks": None}
+    self._vad_metrics = Metric(config=MetricConfig(**vad_config))
 
-    @parameterized.expand([(128,), (5,)])
-    def test_metric_topks_vpr_task(self, num_classes):
-        # Metrics processing for vpr task
-        preds = torch.rand(32, num_classes)
-        labels = torch.randint(0, num_classes, (32,))
-        glog.info("Predicts: {}".format(preds.shape))
-        glog.info("Labels: {}".format(labels.shape))
-        metrics = self._vpr_metrics(preds=preds, labels=labels)
-        for key in metrics:
-            glog.info(" {}: {}".format(key, metrics[key]))
+  @parameterized.expand([(128,), (5,)])
+  def test_metric_topks_vpr_task(self, num_classes):
+    # Metrics processing for vpr task
+    preds = torch.rand(32, num_classes)
+    labels = torch.randint(0, num_classes, (32,))
+    glog.info("Predicts: {}".format(preds.shape))
+    glog.info("Labels: {}".format(labels.shape))
+    metrics = self._vpr_metrics(preds=preds, labels=labels)
+    for key in metrics:
+      glog.info(" {}: {}".format(key, metrics[key]))
 
-    @parameterized.expand([(
-        torch.Tensor([[1, 0]]),
-        torch.Tensor([[[0.4498, 0.7822], [0.6885, 0.3769]]]),
-        torch.Tensor([1]),
-    ),
-                           (
-                               torch.Tensor([[0, 0, 0], [1, 1, 0]]),
-                               torch.Tensor([[[0.8438,
-                                               0.6637], [0.0040, 0.9138],
-                                              [0.2288, 0.9692]],
-                                             [[0.5117,
-                                               0.8571], [0.3471, 0.5770],
-                                              [0.4606, 0.1697]]]),
-                               torch.Tensor([0.66666666666666]),
-                           )])
-    def test_metric_topks_vad_task(self, label, preds, acc_true_value):
-        # Metrics of Vad task
-        acc = self._vad_metrics._vad_accuarcy(preds, label)
-        self.assertEqual(acc, acc_true_value)
-        acc = self._vad_metrics(preds, label)
-        self.assertDictEqual(acc, {"acc": acc_true_value})
+  @parameterized.expand([(
+      torch.Tensor([[1, 0]]),
+      torch.Tensor([[[0.4498, 0.7822], [0.6885, 0.3769]]]),
+      torch.Tensor([1]),
+  ),
+                         (
+                             torch.Tensor([[0, 0, 0], [1, 1, 0]]),
+                             torch.Tensor([[[0.8438, 0.6637], [0.0040, 0.9138], [0.2288, 0.9692]],
+                                           [[0.5117, 0.8571], [0.3471, 0.5770], [0.4606, 0.1697]]]),
+                             torch.Tensor([0.66666666666666]),
+                         )])
+  def test_metric_topks_vad_task(self, label, preds, acc_true_value):
+    # Metrics of Vad task
+    acc = self._vad_metrics._vad_accuarcy(preds, label)
+    self.assertEqual(acc, acc_true_value)
+    acc = self._vad_metrics(preds, label)
+    self.assertDictEqual(acc, {"acc": acc_true_value})
 
-    @parameterized.expand([
-        (torch.Tensor([[0, 0, 1, 1, 1]]),
-         torch.Tensor([[[0.4498, 0.7822], [0.6885, 0.3769], [0.6885, 0.3769],
-                        [0.6885, 0.3769], [0.4498, 0.7822]]]), 0.2, 0.4),
-    ])
-    def test_metrics_vad_far_frr(self, labels, preds, far_t, frr_t):
-        # Unittest of FAR FRR.
-        far, frr = self._vad_metrics._vad_far_frr(preds=preds, labels=labels)
-        self.assertEqual(far, far_t)
-        self.assertEqual(frr, frr_t)
+  @parameterized.expand([
+      (torch.Tensor([[0, 0, 1, 1, 1]]),
+       torch.Tensor([[[0.4498, 0.7822], [0.6885, 0.3769], [0.6885, 0.3769], [0.6885, 0.3769],
+                      [0.4498, 0.7822]]]), 0.2, 0.4),
+  ])
+  def test_metrics_vad_far_frr(self, labels, preds, far_t, frr_t):
+    # Unittest of FAR FRR.
+    far, frr = self._vad_metrics._vad_far_frr(preds=preds, labels=labels)
+    self.assertEqual(far, far_t)
+    self.assertEqual(frr, frr_t)
 
 
 if __name__ == "__main__":
-    unittest.main()
+  unittest.main()
