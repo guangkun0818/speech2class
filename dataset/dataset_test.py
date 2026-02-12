@@ -73,7 +73,8 @@ class VprDatasetTest(unittest.TestCase):
       glog.info("Feats size {}.".format(batch["feat"].shape))
       glog.info("Speak_ids size {}.".format(batch["label"]))
 
-    glog.info("Total iter {} with batch size {}.".format(count, self._config["batch_size"]))
+    glog.info("Total iter {} with batch size {}.".format(
+        count, self._config["batch_size"]))
 
 
 class VadDatasetTest(unittest.TestCase):
@@ -111,8 +112,9 @@ class VadDatasetTest(unittest.TestCase):
     self._vad_eval_dataset = VadEvalDataset(self._config)
 
     self._test_config = {"test_data": "sample_data/vad_eval_data.json"}
-    self._vad_test_dataset = VadTestDataset(dataset_json=self._test_config["test_data"],
-                                            frontend="sample_data/model/demo_task/frontend.script")
+    self._vad_test_dataset = VadTestDataset(
+        dataset_json=self._test_config["test_data"],
+        frontend="sample_data/model/demo_task/frontend.script")
 
   def test_vad_train_dataset(self):
     # Unittest of train dataset
@@ -145,7 +147,8 @@ class VadDatasetTest(unittest.TestCase):
       glog.info("Feats size {}.".format(batch["feat"].shape))
       glog.info("Labels size {}.".format(batch["label"].shape))
 
-    glog.info("Total iter {} with batch size {}.".format(count, self._config["batch_size"]))
+    glog.info("Total iter {} with batch size {}.".format(
+        count, self._config["batch_size"]))
 
   def test_vad_test_dataset(self):
     # Unittest of test dataset

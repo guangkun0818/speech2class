@@ -29,7 +29,8 @@ class BasicBlock(nn.Module):
                   kernel_size=3,
                   stride=stride,
                   padding=1,
-                  bias=False), nn.BatchNorm2d(out_channels), nn.ReLU(inplace=True),
+                  bias=False), nn.BatchNorm2d(out_channels),
+        nn.ReLU(inplace=True),
         nn.Conv2d(in_channels=out_channels,
                   out_channels=out_channels * self.EXPANSION,
                   kernel_size=3,
@@ -69,14 +70,18 @@ class BottleNeckBlock(nn.Module):
     #  Conv2d(3 * 3, 64)
     #  Conv2d(1 * 1, 256))
     self._residual_function = nn.Sequential(
-        nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, bias=False),
-        nn.BatchNorm2d(out_channels), nn.ReLU(inplace=True),
+        nn.Conv2d(in_channels=in_channels,
+                  out_channels=out_channels,
+                  kernel_size=1,
+                  bias=False), nn.BatchNorm2d(out_channels),
+        nn.ReLU(inplace=True),
         nn.Conv2d(in_channels=out_channels,
                   out_channels=out_channels,
                   kernel_size=3,
                   stride=stride,
                   padding=1,
-                  bias=False), nn.BatchNorm2d(out_channels), nn.ReLU(inplace=True),
+                  bias=False), nn.BatchNorm2d(out_channels),
+        nn.ReLU(inplace=True),
         nn.Conv2d(in_channels=out_channels,
                   out_channels=out_channels * self.EXPANSION,
                   kernel_size=1,
@@ -110,7 +115,12 @@ class StatisticPooling(nn.Module):
     self._input_dim = input_dim
     self._output_dim = self._input_dim * 2
 
-  def _statistic_std(self, x: torch.Tensor, mean_x: torch.Tensor, dim=-1, unbiased=False, eps=1e-8):
+  def _statistic_std(self,
+                     x: torch.Tensor,
+                     mean_x: torch.Tensor,
+                     dim=-1,
+                     unbiased=False,
+                     eps=1e-8):
     # Add epsilon in sqrt function to gain more numerically stable
     var = torch.sum((x - mean_x.unsqueeze(-1))**2, dim=dim)
     if unbiased:
@@ -170,8 +180,9 @@ class EmbeddingLayer(nn.Module):
     self._fc_layers = []
     for i in range(len(self._embedding_dims)):
       self._fc_layers.append(
-          nn.Sequential(_Fc_layer(input_dim=self._input_dims[i],
-                                  output_dim=self._embedding_dims[i])))
+          nn.Sequential(
+              _Fc_layer(input_dim=self._input_dims[i],
+                        output_dim=self._embedding_dims[i])))
     self._fc_layers = nn.Sequential(*self._fc_layers)
 
   def forward(self, x):
@@ -213,7 +224,10 @@ class ResNet(nn.Module):
   def __init__(self, config: ResNetConfig):
     super(ResNet, self).__init__()
 
-    self._blocks_pool = {"BasicBlock": BasicBlock, "BottleNeckBlock": BottleNeckBlock}
+    self._blocks_pool = {
+        "BasicBlock": BasicBlock,
+        "BottleNeckBlock": BottleNeckBlock
+    }
 
     self._feats_dim = config.feats_dim
     self._block_type = self._blocks_pool[config.block_type]
@@ -227,13 +241,17 @@ class ResNet(nn.Module):
         nn.BatchNorm2d(self._in_channels), nn.ReLU(inplace=True))
 
     # Different with original paper, stride of first ResNet block is 1
-    self._resnet_block_1 = self._make_layer(self._block_type, config.in_channels,
+    self._resnet_block_1 = self._make_layer(self._block_type,
+                                            config.in_channels,
                                             self._num_blocks[0], 1)
-    self._resnet_block_2 = self._make_layer(self._block_type, config.in_channels * 2,
+    self._resnet_block_2 = self._make_layer(self._block_type,
+                                            config.in_channels * 2,
                                             self._num_blocks[1], 2)
-    self._resnet_block_3 = self._make_layer(self._block_type, config.in_channels * 4,
+    self._resnet_block_3 = self._make_layer(self._block_type,
+                                            config.in_channels * 4,
                                             self._num_blocks[2], 2)
-    self._resnet_block_4 = self._make_layer(self._block_type, config.in_channels * 8,
+    self._resnet_block_4 = self._make_layer(self._block_type,
+                                            config.in_channels * 8,
                                             self._num_blocks[3], 2)
 
     # Compute output feats dim for pooling layer config
@@ -242,8 +260,9 @@ class ResNet(nn.Module):
 
     # Compress timestep dimension infomation as embedding
     self._pooling_layer = StatisticPooling(input_dim=self._output_dim)
-    self._embedding_layer = EmbeddingLayer(input_dim=self._pooling_layer.output_dim,
-                                           embedding_dims=self._embedding_dims)
+    self._embedding_layer = EmbeddingLayer(
+        input_dim=self._pooling_layer.output_dim,
+        embedding_dims=self._embedding_dims)
 
   @property
   def output_dim(self):

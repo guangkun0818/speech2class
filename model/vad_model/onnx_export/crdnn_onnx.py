@@ -31,8 +31,9 @@ class CrdnnOnnxInference(Crdnn):
   def __init__(self, config: CrdnnConfig):
     super(CrdnnOnnxInference, self).__init__(config)
 
-  def forward(self, x: torch.Tensor, cache: Tuple[List[torch.Tensor], Tuple[torch.Tensor,
-                                                                            torch.Tensor]]):
+  def forward(self, x: torch.Tensor, cache: Tuple[List[torch.Tensor],
+                                                  Tuple[torch.Tensor,
+                                                        torch.Tensor]]):
     # Override original forward as inference
     logits, next_cache = self.inference(x, cache)
 

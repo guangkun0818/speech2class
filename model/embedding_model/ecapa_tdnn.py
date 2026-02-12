@@ -33,7 +33,8 @@ class EcapaTdnn(nn.Module):
     # Load pretrain model from Huggingface with only
     self._embedding_model = EncoderClassifier.from_hparams(
         source="speechbrain/spkrec-ecapa-voxceleb",
-        savedir="pretrained_models/spkrec-ecapa-voxceleb").mods["embedding_model"]
+        savedir="pretrained_models/spkrec-ecapa-voxceleb"
+    ).mods["embedding_model"]
 
     self._activate_params()  # Activate frozen params
 
@@ -43,9 +44,11 @@ class EcapaTdnn(nn.Module):
 
   def forward(self, feats: torch.Tensor) -> torch.Tensor:
     """ Training graph """
-    return self._embedding_model(feats).squeeze(1)  # [batch_size, embedding_dim]
+    return self._embedding_model(feats).squeeze(
+        1)  # [batch_size, embedding_dim]
 
   @torch.inference_mode(mode=True)
   def inference(self, feats: torch.Tensor):
     """ Inference graph """
-    return self._embedding_model(feats).squeeze(1)  # [batch_size, embedding_dim]
+    return self._embedding_model(feats).squeeze(
+        1)  # [batch_size, embedding_dim]

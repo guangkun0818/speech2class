@@ -14,7 +14,12 @@ class TestAmSoftmaxLoss(unittest.TestCase):
   """ Unittest of AM-softmax loss """
 
   def setUp(self) -> None:
-    config = {"embedding_dim": 256, "num_classes": 20, "scale_factor": 30.0, "margin": 0.4}
+    config = {
+        "embedding_dim": 256,
+        "num_classes": 20,
+        "scale_factor": 30.0,
+        "margin": 0.4
+    }
     self._loss = AmSoftmaxLoss(config=AmSoftmaxLossConfig(**config))
 
   def test_config(self):

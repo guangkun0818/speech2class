@@ -51,7 +51,8 @@ class VadInference(VadTask):
 
     self._test_data = infer_config["test_data"]
     # Load torchscript frontend
-    self._frontend_model = os.path.join(task_config["task"]["export_path"], "frontend.script")
+    self._frontend_model = os.path.join(task_config["task"]["export_path"],
+                                        "frontend.script")
 
     self._post_process, self._post_process_config = self.post_process_factory(
         infer_config["post_process"])
@@ -79,7 +80,8 @@ class VadInference(VadTask):
     # Dynamic quantize Linear and RNN layer
     model_quant = torch.quantization.quantize_dynamic(
         model_quant,  # the original model 
-        {torch.nn.Linear, torch.nn.GRU, torch.nn.LSTM},  # a set of layers to dynamically quantize 
+        {torch.nn.Linear, torch.nn.GRU, torch.nn.LSTM
+        },  # a set of layers to dynamically quantize 
         dtype=torch.qint8)
 
     vad_model_int8 = torch.jit.script(model_quant)
@@ -99,8 +101,9 @@ class VadInference(VadTask):
     model.forward = self._vad_model.vad_model.initialize_cache
     # Onnx will flatten original cache into Tuple[cache_0, cache_1, ...]
     output_names = ["cache_%d" % i for i in range(num_cache)]
-    init_model_path = os.path.join(self._model_export_path,
-                                   "{}_init.onnx".format(model.__class__.__name__))
+    init_model_path = os.path.join(
+        self._model_export_path,
+        "{}_init.onnx".format(model.__class__.__name__))
 
     # Args is required by onnx export, set as empty for init
     torch.onnx.export(model,
@@ -117,8 +120,9 @@ class VadInference(VadTask):
 
     input_names = ["feats"] + ["cache_%d" % i for i in range(num_cache)]
     output_names = ["logits"] + ["next_cache_%d" % i for i in range(num_cache)]
-    infer_model_path = os.path.join(self._model_export_path,
-                                    "{}_inference.onnx".format(model.__class__.__name__))
+    infer_model_path = os.path.join(
+        self._model_export_path,
+        "{}_inference.onnx".format(model.__class__.__name__))
 
     torch.onnx.export(model,
                       args=(dummy_feats, dummy_cache),
@@ -133,8 +137,9 @@ class VadInference(VadTask):
     # frontend.script conflict with num_works > 1. This happends when "ddp_spawn"
     # specified, which should replace with "ddp". However, MacBook seems only
     # ddp_spawn supported.
-    dataloader = DataLoader(dataset=dataset, batch_size=1,
-                            num_workers=4)  # only support batch_size = 1 currently
+    dataloader = DataLoader(
+        dataset=dataset, batch_size=1,
+        num_workers=4)  # only support batch_size = 1 currently
     return dataloader
 
   def post_process_factory(self, config: Dict):
@@ -153,7 +158,8 @@ class VadInference(VadTask):
     # Inference in streaming mode, simulated
     for frame_id in range(0, feat_len, 1):
       # Simulate streaming inference
-      logits, cache = self._vad_model.inference(feat[:, frame_id:frame_id + 1, :], cache)
+      logits, cache = self._vad_model.inference(
+          feat[:, frame_id:frame_id + 1, :], cache)
       stream_output.append(logits)
     predictions = torch.concat(stream_output, dim=1)
 
@@ -186,7 +192,8 @@ class VadInference(VadTask):
     feat_len = batch["feat"].shape[1]
     for frame_id in range(0, feat_len, 1):
       # Simulate streaming inference
-      logits, cache = self._vad_model.inference(feat[:, frame_id:frame_id + 1, :], cache)
+      logits, cache = self._vad_model.inference(
+          feat[:, frame_id:frame_id + 1, :], cache)
 
       pred_label = torch.argmax(logits, dim=-1, keepdim=True)
       post_process_output.append(torch.zeros(1, 1, 1))
@@ -222,7 +229,8 @@ class VadInference(VadTask):
         post_process_output[i] = torch.ones(1, 1, 1)
 
     predictions = torch.concat(post_process_output, dim=1).squeeze(-1)
-    predictions = F.one_hot(predictions.to(device=feat.device).to(dtype=torch.int64))
+    predictions = F.one_hot(
+        predictions.to(device=feat.device).to(dtype=torch.int64))
 
     return predictions
 
@@ -231,10 +239,9 @@ class VadInference(VadTask):
     predictions = self._post_process(batch, **self._post_process_config)
 
     batch_metrics = self._metric.vad_infer_metrics(predictions, batch["label"])
-    glog.info("{}: acc: {:.3f} far: {:.3f} frr: {:.3f}".format(batch["utt"][0],
-                                                               batch_metrics["acc"] * 100,
-                                                               batch_metrics["far"] * 100,
-                                                               batch_metrics["frr"] * 100))
+    glog.info("{}: acc: {:.3f} far: {:.3f} frr: {:.3f}".format(
+        batch["utt"][0], batch_metrics["acc"] * 100, batch_metrics["far"] * 100,
+        batch_metrics["frr"] * 100))
 
     for met_t in batch_metrics:
       assert met_t in self._total_metrics
@@ -283,7 +290,8 @@ def inference():
   FLAGS(sys.argv)
   with open(FLAGS.inference_config, 'r') as config_yaml:
     infer_config = yaml.load(config_yaml.read(), Loader=yaml.FullLoader)
-    task_config = yaml.load(open(infer_config["task_config"], 'r').read(), Loader=yaml.FullLoader)
+    task_config = yaml.load(open(infer_config["task_config"], 'r').read(),
+                            Loader=yaml.FullLoader)
 
   # Set up load and export path
   TASK_TYPE = task_config["task"]["type"]
@@ -292,23 +300,29 @@ def inference():
   # Backup inference config and setup logging
   glog.info("{} inference setting up ....".format(TASK_TYPE))
   os.makedirs(INFER_EXPORT_PATH, exist_ok=True)
-  handler = logging.FileHandler(os.path.join(INFER_EXPORT_PATH, "inference.log"))
-  shutil.copyfile(FLAGS.inference_config,
-                  os.path.join(INFER_EXPORT_PATH, os.path.basename(FLAGS.inference_config)))
+  handler = logging.FileHandler(os.path.join(INFER_EXPORT_PATH,
+                                             "inference.log"))
+  shutil.copyfile(
+      FLAGS.inference_config,
+      os.path.join(INFER_EXPORT_PATH, os.path.basename(FLAGS.inference_config)))
   glog.init()
   glog.logger.addHandler(handler)
   glog.info(infer_config)
 
   # ----- Inference -----
   if infer_config["chkpt_aver"] == True:
-    model_average(os.path.join(task_config["task"]["export_path"], "checkpoints"))
-    CHKPT_PATH = os.path.join(task_config["task"]["export_path"], "checkpoints", "averaged.chkpt")
+    model_average(
+        os.path.join(task_config["task"]["export_path"], "checkpoints"))
+    CHKPT_PATH = os.path.join(task_config["task"]["export_path"], "checkpoints",
+                              "averaged.chkpt")
   else:
-    assert infer_config["chkpt_name"], "Please specify chkpt_name if chkpt_aver not applied."
+    assert infer_config[
+        "chkpt_name"], "Please specify chkpt_name if chkpt_aver not applied."
     CHKPT_PATH = os.path.join(task_config["task"]["export_path"], "checkpoints",
                               infer_config["chkpt_name"])
   task_inference = InferFactory[TASK_TYPE].value.load_from_checkpoint(
-      CHKPT_PATH, task_config=task_config, infer_config=infer_config)  # Build from InferFactory
+      CHKPT_PATH, task_config=task_config,
+      infer_config=infer_config)  # Build from InferFactory
 
   trainer = pl.Trainer(logger=False, **infer_config["trainer"])
   trainer.test(task_inference)

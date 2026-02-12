@@ -81,7 +81,8 @@ class KaldiFbankTest(unittest.TestCase):
     # example_input of pcms shape as (1, 41360), which can be precisly extracted 257 frames
     # features solving this unittest issue temporaily.
     pt_feats = self._kaldi_frontend(pcms)
-    torchscript_frontend = torch.jit.trace(self._kaldi_frontend, example_inputs=pcms)
+    torchscript_frontend = torch.jit.trace(self._kaldi_frontend,
+                                           example_inputs=pcms)
     torchscript_frontend = torch.jit.script(torchscript_frontend)
 
     # Torchscript frontend precision check

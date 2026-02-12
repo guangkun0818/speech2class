@@ -25,7 +25,8 @@ class EcapaFrontend(nn.Module):
     # `compute_features` loaded for feature_extraction
     self._feature_extractor = EncoderClassifier.from_hparams(
         source="speechbrain/spkrec-ecapa-voxceleb",
-        savedir="pretrained_models/spkrec-ecapa-voxceleb").mods["compute_features"]
+        savedir="pretrained_models/spkrec-ecapa-voxceleb"
+    ).mods["compute_features"]
 
   @torch.no_grad()
   def forward(self, pcm: torch.Tensor) -> torch.Tensor:

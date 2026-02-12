@@ -23,7 +23,8 @@ from vad_task import VadTask
 
 FLAGS = gflags.FLAGS
 
-gflags.DEFINE_string("config_path", "config/training/resnet18.yaml", "YAML configuration of Task")
+gflags.DEFINE_string("config_path", "config/training/resnet18.yaml",
+                     "YAML configuration of Task")
 
 
 @unique
@@ -53,8 +54,9 @@ def run_task():
 
   # Initialize Task
   glog.info("{} Task building....".format(TASK_TYPE))
-  shutil.copyfile(FLAGS.config_path,
-                  os.path.join(TASK_EXPORT_PATH, os.path.basename(FLAGS.config_path)))
+  shutil.copyfile(
+      FLAGS.config_path,
+      os.path.join(TASK_EXPORT_PATH, os.path.basename(FLAGS.config_path)))
 
   glog.info(config)
 
@@ -62,19 +64,20 @@ def run_task():
   # Setup pretrained-model if finetune/base_model is set
   if config["finetune"]["base_model"]:
     # If base_model of finetune is set, then finetune from base_model
-    task = TaskFactory[TASK_TYPE].value.load_from_checkpoint(config["finetune"]["base_model"],
-                                                             config=config)
+    task = TaskFactory[TASK_TYPE].value.load_from_checkpoint(
+        config["finetune"]["base_model"], config=config)
   else:
     task = TaskFactory[TASK_TYPE].value(config)  # Build from TaskFactory
 
   # CallBacks function setup
-  chkpt_filename = TASK_NAME + "-{epoch}-{val_loss:.2f}" + "-{%s:.2f}" % config["callbacks"][
-      "model_chkpt_config"]["monitor"]
+  chkpt_filename = TASK_NAME + "-{epoch}-{val_loss:.2f}" + "-{%s:.2f}" % config[
+      "callbacks"]["model_chkpt_config"]["monitor"]
 
   chkpt_callback = callbacks.ModelCheckpoint(
       dirpath=os.path.join(TASK_EXPORT_PATH, "checkpoints"),
       filename=chkpt_filename,
-      **config["callbacks"]["model_chkpt_config"])  # Callbacks save chkpt of model.
+      **config["callbacks"]
+      ["model_chkpt_config"])  # Callbacks save chkpt of model.
 
   lr_monitor = callbacks.LearningRateMonitor(logging_interval='step')
   callback_funcs = [chkpt_callback, lr_monitor]

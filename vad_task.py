@@ -86,8 +86,9 @@ class VadTask(pl.LightningModule):
     loss = self._loss({"logits": logits, "labels": batch["label"]})
 
     if batch_idx % 100 == 0:
-      glog.info("Train (Epoch: {} / Local_steps: {} / Global_steps: {}) loss: {}".format(
-          self.current_epoch, batch_idx, self.global_step, loss))
+      glog.info(
+          "Train (Epoch: {} / Local_steps: {} / Global_steps: {}) loss: {}".
+          format(self.current_epoch, batch_idx, self.global_step, loss))
     self.log("train_loss", loss)
 
     return loss
@@ -104,21 +105,28 @@ class VadTask(pl.LightningModule):
 
     # During eval stage, "labels" works just for consist of API
     preds = self._vad_model.compute_logits(output)
-    predictions = self._loss.predict({"logits": preds, "labels": batch["label"]})
+    predictions = self._loss.predict({
+        "logits": preds,
+        "labels": batch["label"]
+    })
 
     glog.info("Evaluating....")
     metrics = self._metric(preds=predictions, labels=batch["label"])
 
     if batch_idx % 100 == 0:
-      glog.info("Eval (Epoch: {} / Local_steps: {} / Global_steps: {}) loss: {} Metrics: {}".format(
-          self.current_epoch, batch_idx, self.global_step, loss, metrics))
+      glog.info(
+          "Eval (Epoch: {} / Local_steps: {} / Global_steps: {}) loss: {} Metrics: {}"
+          .format(self.current_epoch, batch_idx, self.global_step, loss,
+                  metrics))
     self.log_dict({"val_loss": loss, **metrics}, sync_dist=True)
 
   def configure_optimizers(self):
     """ Optimizer configuration """
     Optimizer, LR_Scheduler = OptimSetup(self._optim_config)
-    optimizer = Optimizer(self.parameters(), **self._optim_config["optimizer"]["config"])
-    lr_scheduler = LR_Scheduler(optimizer=optimizer, **self._optim_config["lr_scheduler"]["config"])
+    optimizer = Optimizer(self.parameters(),
+                          **self._optim_config["optimizer"]["config"])
+    lr_scheduler = LR_Scheduler(optimizer=optimizer,
+                                **self._optim_config["lr_scheduler"]["config"])
     return {
         "optimizer": optimizer,
         "lr_scheduler": {
