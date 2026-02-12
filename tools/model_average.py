@@ -28,7 +28,8 @@ def model_average(chkpt_dir) -> None:
   count += 1  # Num of tracked chkpts.
 
   for k in aver_model["state_dict"]:
-    aver_model["state_dict"][k] = torch.true_divide(aver_model["state_dict"][k], count)
+    aver_model["state_dict"][k] = torch.true_divide(aver_model["state_dict"][k],
+                                                    count)
   out_path = os.path.join(chkpt_dir, "averaged.chkpt")
   glog.info("Saving averaged model into {}...".format(out_path))
   torch.save(aver_model, out_path)

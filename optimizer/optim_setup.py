@@ -21,7 +21,8 @@ def OptimSetup(config):
   if config["optimizer"]["type"] == "Adam":
     optimizer = Adam
   else:
-    raise ValueError("{} optimizer is not supported.".format(config["optimizer"]["type"]))
+    raise ValueError("{} optimizer is not supported.".format(
+        config["optimizer"]["type"]))
 
   if config["lr_scheduler"]["type"] == "ReduceLROnPlateau":
     lr_scheduler = ReduceLROnPlateau
@@ -30,7 +31,8 @@ def OptimSetup(config):
   elif config["lr_scheduler"]["type"] == "Warmup":
     lr_scheduler = WarmupLR
   else:
-    raise ValueError("{} lr_scheduler is not supported.".format(config["lr_scheduler"]["type"]))
+    raise ValueError("{} lr_scheduler is not supported.".format(
+        config["lr_scheduler"]["type"]))
   return optimizer, lr_scheduler
 
 
@@ -68,7 +70,8 @@ class WarmupLR(_LRScheduler):
       return [lr * step_num**-0.5 for lr in self.base_lrs]
     else:
       return [
-          lr * self.warmup_steps**0.5 * min(step_num**-0.5, step_num * self.warmup_steps**-1.5)
+          lr * self.warmup_steps**0.5 *
+          min(step_num**-0.5, step_num * self.warmup_steps**-1.5)
           for lr in self.base_lrs
       ]
 

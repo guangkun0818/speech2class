@@ -36,8 +36,10 @@ class CnnBlockBase(nn.Module):
   def __init__(self, config: CnnBlockConfig) -> None:
     super(CnnBlockBase, self).__init__()
 
-    assert len(config.kernel_configs) == len(config.dilation_config) == config.num_layers
-    assert len(config.in_channels_config) == len(config.out_channels_config) == config.num_layers
+    assert len(config.kernel_configs) == len(
+        config.dilation_config) == config.num_layers
+    assert len(config.in_channels_config) == len(
+        config.out_channels_config) == config.num_layers
 
     self._num_layers = config.num_layers
     self._input_dim = config.input_dim
@@ -51,8 +53,10 @@ class CnnBlockBase(nn.Module):
     self._normalization = nn.BatchNorm1d(num_features=self._input_dim)
 
     # Build cnn block by stacking cnn_layer
-    self._cnn_layers = torch.nn.ModuleList(
-        [nn.Sequential(*self._make_cnn_layers(layer_id)) for layer_id in range(self._num_layers)])
+    self._cnn_layers = torch.nn.ModuleList([
+        nn.Sequential(*self._make_cnn_layers(layer_id))
+        for layer_id in range(self._num_layers)
+    ])
 
   @abc.abstractmethod
   def _make_cnn_layers(self, layer_id):
@@ -128,21 +132,22 @@ class Conv1dCnnBlock(CnnBlockBase):
   @property
   def cache_size(self) -> List[int]:
     # Cache size of Conv1d Cnn block
-    return [
-        (self._kernel_configs[i] - 1) * self._dilation_config[i] for i in range(self._num_layers)
-    ]
+    return [(self._kernel_configs[i] - 1) * self._dilation_config[i]
+            for i in range(self._num_layers)]
 
   @property
   def output_dim(self) -> int:
     # Out_dim of Conv1d Cnn block
     return self._out_channels_config[-1]
 
-  def _left_padding(self, feats: torch.Tensor, padding_size: int) -> torch.Tensor:
+  def _left_padding(self, feats: torch.Tensor,
+                    padding_size: int) -> torch.Tensor:
     # Conv1d left padding
     # Feats: (B, D, T) -> (B, D, T + padding_size), padding left with 0
     batch_size = feats.shape[0]
     feats_dim = feats.shape[1]
-    left_padding = torch.zeros(batch_size, feats_dim, padding_size).to(feats.device)
+    left_padding = torch.zeros(batch_size, feats_dim,
+                               padding_size).to(feats.device)
     feats = torch.concat([left_padding, feats], dim=-1)
     return feats
 
@@ -168,8 +173,9 @@ class Conv1dCnnBlock(CnnBlockBase):
 
   @torch.jit.export
   @torch.inference_mode(mode=True)
-  def inference(self, x: torch.Tensor,
-                cache: List[torch.Tensor]) -> Tuple[torch.Tensor, List[torch.Tensor]]:
+  def inference(
+      self, x: torch.Tensor,
+      cache: List[torch.Tensor]) -> Tuple[torch.Tensor, List[torch.Tensor]]:
     """ "feat": Tensor.Float (1, T, D),
             "cache": List[layer_0 cache(Tensor.Float), layer_1 cache(Tensor.Float), ...],
         """
@@ -195,7 +201,8 @@ class Conv2dCnnBlock(CnnBlockBase):
 
   def __init__(self, config: CnnBlockConfig) -> None:
     assert config.conv_type == "conv2d"
-    assert config.in_channels_config[0] == 1, "If conv2d is set, in_channels of 1st layer should 1."
+    assert config.in_channels_config[
+        0] == 1, "If conv2d is set, in_channels of 1st layer should 1."
 
     super(Conv2dCnnBlock, self).__init__(config=config)
 
@@ -231,13 +238,15 @@ class Conv2dCnnBlock(CnnBlockBase):
       length = math.floor((length - dilation * (k_size - 1) - 1) / stride + 1)
     return length * self._out_channels_config[-1]
 
-  def _left_padding(self, feats: torch.Tensor, padding_size: int) -> torch.Tensor:
+  def _left_padding(self, feats: torch.Tensor,
+                    padding_size: int) -> torch.Tensor:
     # Conv2d left padding
     # Feats: (B, C, T, D) -> (B, C, T + padding_size, D), padding left with 0
     batch_size = feats.shape[0]
     channel_dim = feats.shape[1]
     feats_dim = feats.shape[-1]
-    left_padding = torch.zeros(batch_size, channel_dim, padding_size, feats_dim).to(feats.device)
+    left_padding = torch.zeros(batch_size, channel_dim, padding_size,
+                               feats_dim).to(feats.device)
     feats = torch.concat([left_padding, feats], dim=2)
     return feats
 
@@ -257,7 +266,8 @@ class Conv2dCnnBlock(CnnBlockBase):
     # rewards of 0.5% of eval acc from the extensive infos benefit from
     # this disarange. Worthy sacrifice for streaming anyway.
     x = x.transpose(1, 2).contiguous().reshape(
-        x.shape[0], x.shape[2], -1)  # (B, C, T, D）-> (B, T, C, D) -> (B, T, C * D) - for Conv2d
+        x.shape[0], x.shape[2],
+        -1)  # (B, C, T, D）-> (B, T, C, D) -> (B, T, C * D) - for Conv2d
 
     return x
 
@@ -269,7 +279,8 @@ class Conv2dCnnBlock(CnnBlockBase):
     for layer_id in range(self._num_layers):
       # The first cache is (1, 1, T_cache_size, input_dim) where Batchsize = channels = 1
       cache.append(
-          torch.zeros(1, self._in_channels_config[layer_id], self.cache_size[layer_id], length))
+          torch.zeros(1, self._in_channels_config[layer_id],
+                      self.cache_size[layer_id], length))
       # Only pick Freq domain of (T, F) for out_dim compute
       dilation = self._dilation_config[layer_id][1]
       k_size = self._kernel_configs[layer_id][1]
@@ -279,8 +290,9 @@ class Conv2dCnnBlock(CnnBlockBase):
 
   @torch.jit.export
   @torch.inference_mode(mode=True)
-  def inference(self, x: torch.Tensor,
-                cache: List[torch.Tensor]) -> Tuple[torch.Tensor, List[torch.Tensor]]:
+  def inference(
+      self, x: torch.Tensor,
+      cache: List[torch.Tensor]) -> Tuple[torch.Tensor, List[torch.Tensor]]:
     """ "feat": Tensor.Float (1, T, D),
             "cache": List[layer_0 cache(Tensor.Float), layer_1 cache(Tensor.Float), ...],
         """
@@ -295,8 +307,9 @@ class Conv2dCnnBlock(CnnBlockBase):
       next_cache.append(x[:, :, cache_pos:, :])
       x = cnn_layer(x)
 
-    x = x.transpose(1, 2).reshape(x.shape[0], x.shape[2],
-                                  -1)  # (B, C, T, D) -> (B, T, C, D)->(B, T, C * D) for Conv2d
+    x = x.transpose(1, 2).reshape(
+        x.shape[0], x.shape[2],
+        -1)  # (B, C, T, D) -> (B, T, C, D)->(B, T, C * D) for Conv2d
 
     return x, next_cache
 
@@ -328,12 +341,12 @@ class DnnBlock(nn.Module):
     for layer_id in range(self._num_layers):
       if layer_id == 0:
         dnn_layers.append(
-            nn.Sequential(nn.Linear(self._input_dim, self._hidden_dim), nn.LeakyReLU(),
-                          nn.Dropout(p=self._dropout_p)))
+            nn.Sequential(nn.Linear(self._input_dim, self._hidden_dim),
+                          nn.LeakyReLU(), nn.Dropout(p=self._dropout_p)))
       else:
         dnn_layers.append(
-            nn.Sequential(nn.Linear(self._hidden_dim, self._hidden_dim), nn.LeakyReLU(),
-                          nn.Dropout(p=self._dropout_p)))
+            nn.Sequential(nn.Linear(self._hidden_dim, self._hidden_dim),
+                          nn.LeakyReLU(), nn.Dropout(p=self._dropout_p)))
     return dnn_layers
 
   @property
@@ -436,7 +449,8 @@ class GruRnnBlock(RnnBlockBase):
     return cache
 
   @torch.inference_mode(mode=True)
-  def inference(self, x: torch.Tensor, cache: Tuple[torch.Tensor, torch.Tensor]):
+  def inference(self, x: torch.Tensor, cache: Tuple[torch.Tensor,
+                                                    torch.Tensor]):
     """ "feat": (B, T, D)
             "cache": (h_0, dummy_cache) for GRU
         """
@@ -460,20 +474,21 @@ class LstmRnnBlock(RnnBlockBase):
   def initialize_rnn_cache(self) -> Tuple[torch.Tensor, torch.Tensor]:
     # Initialize rnn cache when streaming inference start. Batch size = 1 is mandatory.
     # LSTM cache: Tuple[torch.Tensor, torch.Tensor]
-    cache = (torch.zeros(self._num_layers, 1,
-                         self._hidden_size), torch.zeros(self._num_layers, 1,
-                                                         self._hidden_size))  # h_0, c_0
+    cache = (torch.zeros(self._num_layers, 1, self._hidden_size),
+             torch.zeros(self._num_layers, 1, self._hidden_size))  # h_0, c_0
     return cache
 
   @torch.jit.export
   @torch.inference_mode(mode=True)
-  def inference(self, x: torch.Tensor, cache: Tuple[torch.Tensor, torch.Tensor]):
+  def inference(self, x: torch.Tensor, cache: Tuple[torch.Tensor,
+                                                    torch.Tensor]):
     """ "feat": (B, T, D)
             "cache": (h_0, c_0) for LSTM
         """
     # Streaming inference graph
     x = self._layernorm(x)
-    output, next_cache = self._rnn_layers(x, (cache[0].to(x.device), cache[1].to(x.device)))
+    output, next_cache = self._rnn_layers(
+        x, (cache[0].to(x.device), cache[1].to(x.device)))
 
     return output, next_cache
 
@@ -494,24 +509,30 @@ class Crdnn(nn.Module):
     # Initialization
     # CnnBlock initialize
     if config.cnn_block_config["conv_type"] == "conv1d":
-      self._cnn_blocks = Conv1dCnnBlock(config=CnnBlockConfig(**config.cnn_block_config))
+      self._cnn_blocks = Conv1dCnnBlock(config=CnnBlockConfig(
+          **config.cnn_block_config))
     elif config.cnn_block_config["conv_type"] == "conv2d":
-      self._cnn_blocks = Conv2dCnnBlock(config=CnnBlockConfig(**config.cnn_block_config))
+      self._cnn_blocks = Conv2dCnnBlock(config=CnnBlockConfig(
+          **config.cnn_block_config))
 
     # DnnBlock initialize
-    self._dnn_blocks = DnnBlock(_input_dim=self._cnn_blocks.output_dim,
-                                config=DnnBlockConfig(**config.dnn_block_config))
+    self._dnn_blocks = DnnBlock(
+        _input_dim=self._cnn_blocks.output_dim,
+        config=DnnBlockConfig(**config.dnn_block_config))
 
     # RnnBlock initialize
     if config.rnn_block_config["rnn_type"] == "gru":
-      self._rnn_blocks = GruRnnBlock(_input_dim=self._dnn_blocks.output_dim,
-                                     config=RnnBlockConfig(**config.rnn_block_config))
+      self._rnn_blocks = GruRnnBlock(
+          _input_dim=self._dnn_blocks.output_dim,
+          config=RnnBlockConfig(**config.rnn_block_config))
     elif config.rnn_block_config["rnn_type"] == "lstm":
-      self._rnn_blocks = LstmRnnBlock(_input_dim=self._dnn_blocks.output_dim,
-                                      config=RnnBlockConfig(**config.rnn_block_config))
+      self._rnn_blocks = LstmRnnBlock(
+          _input_dim=self._dnn_blocks.output_dim,
+          config=RnnBlockConfig(**config.rnn_block_config))
 
     # Output layer initialize, linearly transform into dim = 2
-    self._output_layer = nn.Linear(in_features=self._rnn_blocks.output_dim, out_features=2)
+    self._output_layer = nn.Linear(in_features=self._rnn_blocks.output_dim,
+                                   out_features=2)
     self._softmax = nn.Softmax(dim=-1)
 
   @torch.jit.export
@@ -538,8 +559,9 @@ class Crdnn(nn.Module):
 
   @torch.jit.export
   @torch.inference_mode(mode=True)
-  def inference(self, x: torch.Tensor, cache: Tuple[List[torch.Tensor], Tuple[torch.Tensor,
-                                                                              torch.Tensor]]):
+  def inference(self, x: torch.Tensor, cache: Tuple[List[torch.Tensor],
+                                                    Tuple[torch.Tensor,
+                                                          torch.Tensor]]):
     # Streaming inference impl by using inference interface of all blocks.
     cnn_cache = cache[0]  # cnn_cache
     rnn_cache = cache[1]  # rnn_cache

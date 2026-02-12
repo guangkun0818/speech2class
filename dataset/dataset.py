@@ -22,7 +22,10 @@ from dataset.frontend.frontend import EcapaFrontend, KaldiWaveFeature
 class BaseDataset(Dataset):
   """ Base Dataset to inherit for train, eval, test """
 
-  def __init__(self, dataset_json, noiseset_json=None, min_dur_filter=0.0) -> None:
+  def __init__(self,
+               dataset_json,
+               noiseset_json=None,
+               min_dur_filter=0.0) -> None:
     """ Args: Please refer to sample_data for JSON setting.
                 dataset_json: JSON file of data
                 noiseset_json: JSON file of noise data
@@ -31,8 +34,8 @@ class BaseDataset(Dataset):
     super(BaseDataset, self).__init__()
     self._total_duration = 0.0
     # Load json datainfos, _spk_label for one-hot encoding
-    self._dataset, self._spk_label = self._make_dataset_from_json(dataset_json,
-                                                                  min_dur_filter=min_dur_filter)
+    self._dataset, self._spk_label = self._make_dataset_from_json(
+        dataset_json, min_dur_filter=min_dur_filter)
 
     # Load noise set if add noise applied
     self._noise_dataset = []
@@ -92,7 +95,8 @@ class VprTrainDataset(BaseDataset):
   """ TrainDataset with Data Augmentation """
 
   def __init__(self, config) -> None:
-    super(VprTrainDataset, self).__init__(config["train_data"], noiseset_json=config["noise_data"])
+    super(VprTrainDataset, self).__init__(config["train_data"],
+                                          noiseset_json=config["noise_data"])
 
     # Sanity check of config
     glog.check_eq(config["num_classes"], self.num_classes)
@@ -119,7 +123,9 @@ class VprTrainDataset(BaseDataset):
     if feat.shape[-1] < self._chunk_size:
       # If audio feats lengths less than chunksize, should repeat itself
       # to meet the chunk_size requirement
-      feat = feat.repeat(torch.div(self._chunk_size, feat.shape[1], rounding_mode="floor") + 1, 1)
+      feat = feat.repeat(
+          torch.div(self._chunk_size, feat.shape[1], rounding_mode="floor") + 1,
+          1)
     offset = random.randint(0, feat.shape[0] - self._chunk_size)
     feat = feat[offset:offset + self._chunk_size, :]
 
@@ -140,13 +146,17 @@ class VprTrainDataset(BaseDataset):
     # Use add noise proportion control the augmentation ratio of all dataset
     need_noisify_aug = random.uniform(0, 1) < self._add_noise_proportion
     if need_noisify_aug:
-      noise_pcm, _ = torchaudio.load(random.choice(self._noise_dataset), normalize=True)
+      noise_pcm, _ = torchaudio.load(random.choice(self._noise_dataset),
+                                     normalize=True)
       pcm = self._add_noise(pcm, noise_pcm, **self._add_noise_config)
 
     feat = self._frontend(pcm)
     feat = self._spilt_chunk(feat)
 
-    return {"feat": feat, "label": torch.tensor(self._spk_label[data["spk_id"]])}
+    return {
+        "feat": feat,
+        "label": torch.tensor(self._spk_label[data["spk_id"]])
+    }
 
 
 class VprEvalDataset(BaseDataset):
@@ -172,7 +182,9 @@ class VprEvalDataset(BaseDataset):
     if feat.shape[-1] < self._chunk_size:
       # If audio feats lengths less than chunksize, should repeat itself
       # to meet the chunk_size requirement
-      feat = feat.repeat(torch.div(self._chunk_size, feat.shape[1], rounding_mode="floor") + 1, 1)
+      feat = feat.repeat(
+          torch.div(self._chunk_size, feat.shape[1], rounding_mode="floor") + 1,
+          1)
     offset = random.randint(0, feat.shape[0] - self._chunk_size)
     feat = feat[offset:offset + self._chunk_size, :]
 
@@ -192,7 +204,10 @@ class VprEvalDataset(BaseDataset):
     feat = self._frontend(pcm)
     feat = self._spilt_chunk(feat)
 
-    return {"feat": feat, "label": torch.tensor(self._spk_label[data["spk_id"]])}
+    return {
+        "feat": feat,
+        "label": torch.tensor(self._spk_label[data["spk_id"]])
+    }
 
 
 class VadTrainDataset(BaseDataset):
@@ -201,12 +216,13 @@ class VadTrainDataset(BaseDataset):
     """
 
   def __init__(self, config) -> None:
-    super(VadTrainDataset, self).__init__(config["train_data"],
-                                          noiseset_json=config["noise_data"],
-                                          min_dur_filter=config["min_dur_filter"])
+    super(VadTrainDataset,
+          self).__init__(config["train_data"],
+                         noiseset_json=config["noise_data"],
+                         min_dur_filter=config["min_dur_filter"])
 
-    glog.info("Training dataset: {}h with {} entries.".format(self.total_duration / 3600,
-                                                              len(self)))
+    glog.info("Training dataset: {}h with {} entries.".format(
+        self.total_duration / 3600, len(self)))
 
     self._chunk_size = config["chunk_size"]
 
@@ -246,7 +262,8 @@ class VadTrainDataset(BaseDataset):
     # Use add noise proportion control the augmentation ratio of all dataset
     need_noisify_aug = random.uniform(0, 1) < self._add_noise_proportion
     if need_noisify_aug:
-      noise_pcm, _ = torchaudio.load(random.choice(self._noise_dataset), normalize=True)
+      noise_pcm, _ = torchaudio.load(random.choice(self._noise_dataset),
+                                     normalize=True)
       pcm = self._add_noise(pcm, noise_pcm, **self._add_noise_config)
 
     # Volume perturb
@@ -277,11 +294,12 @@ class VadEvalDataset(BaseDataset):
   """ EvalDataset for VAD task. """
 
   def __init__(self, config) -> None:
-    super(VadEvalDataset, self).__init__(config["eval_data"],
-                                         min_dur_filter=config["min_dur_filter"])
+    super(VadEvalDataset,
+          self).__init__(config["eval_data"],
+                         min_dur_filter=config["min_dur_filter"])
 
-    glog.info("Evaluation dataset: {}h with {} entries.".format(self.total_duration / 3600,
-                                                                len(self)))
+    glog.info("Evaluation dataset: {}h with {} entries.".format(
+        self.total_duration / 3600, len(self)))
 
     self._chunk_size = config["chunk_size"]
 
@@ -335,7 +353,8 @@ class VadTestDataset(BaseDataset):
   def __init__(self, dataset_json, frontend) -> None:
     # Testset should not filter any of the data.
     super(VadTestDataset, self).__init__(dataset_json=dataset_json)
-    glog.info("Test dataset: {}h with {} entries.".format(self.total_duration / 3600, len(self)))
+    glog.info("Test dataset: {}h with {} entries.".format(
+        self.total_duration / 3600, len(self)))
 
     # Load Torchscript frontend to init feature extraction session
     self._frontend_sess = torch.jit.load(frontend)

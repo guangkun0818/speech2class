@@ -17,11 +17,13 @@ class EmbeddingModel(nn.Module):
     super(EmbeddingModel, self).__init__()
 
     if config["model"] == "Ecapa_Tdnn":
-      self._embedding_model = EcapaTdnn(config=EcapaTdnnConfig(**config["config"]))
+      self._embedding_model = EcapaTdnn(config=EcapaTdnnConfig(
+          **config["config"]))
     elif config["model"] == "ResNet":
       self._embedding_model = ResNet(config=ResNetConfig(**config["config"]))
     else:
-      raise ValueError("Embedding model {} is not implemented.".format(config["model"]))
+      raise ValueError("Embedding model {} is not implemented.".format(
+          config["model"]))
 
   def forward(self, feats: torch.Tensor) -> torch.Tensor:
     # Training graph

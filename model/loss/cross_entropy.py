@@ -43,7 +43,8 @@ class CELoss(nn.Module):
     # Flatten both logits and labels from (B, T, 2) -> (B * T, 2),
     # where dim=1 indicating speech frame.
     logits = logits.contiguous().reshape(batch_size * seq_len, -1)
-    one_hot_encoding = one_hot_encoding.contiguous().reshape(batch_size * seq_len, -1)
+    one_hot_encoding = one_hot_encoding.contiguous().reshape(
+        batch_size * seq_len, -1)
 
     # Compute final loss
     loss = self._criterion(logits, one_hot_encoding)

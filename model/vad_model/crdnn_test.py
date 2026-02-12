@@ -56,7 +56,8 @@ class TestCnnBlock(unittest.TestCase):
     # Unittest of building model from config
     self.assertListEqual(self._cldnn._in_channels_config, [1, 64, 128])
     self.assertListEqual(self._cldnn._kernel_configs, [(1, 3), (1, 5), (1, 3)])
-    self.assertListEqual(self._cnn_block_2d._kernel_configs, [(3, 3), (5, 3), (3, 3)])
+    self.assertListEqual(self._cnn_block_2d._kernel_configs, [(3, 3), (5, 3),
+                                                              (3, 3)])
 
   @parameterized.expand([(101,), (156,), (271,)])
   def test_cnn_block_1d_forward(self, feat_len):
@@ -64,7 +65,8 @@ class TestCnnBlock(unittest.TestCase):
     feats = torch.rand(4, feat_len, self._cnn_block_1d._input_dim)
     output = self._cnn_block_1d(feats)
     self.assertEqual(output.shape[1], feat_len)
-    self.assertEqual(output.shape[2], self._cnn_block_1d._out_channels_config[-1])
+    self.assertEqual(output.shape[2],
+                     self._cnn_block_1d._out_channels_config[-1])
     self.assertEqual(output.shape[-1], self._cnn_block_1d.output_dim)
 
   @parameterized.expand([(101,), (156,), (271,)])
@@ -79,14 +81,16 @@ class TestCnnBlock(unittest.TestCase):
     stream_output = []
     for frame_id in range(0, feat_len, 1):
       # Simulate streaming inference
-      output, cache = self._cnn_block_1d.inference(feats[:, frame_id:frame_id + 1, :], cache)
+      output, cache = self._cnn_block_1d.inference(
+          feats[:, frame_id:frame_id + 1, :], cache)
       stream_output.append(output)
     stream_output = torch.concat(stream_output, dim=1)
     self.assertEqual(stream_output.shape[1], feat_len)
 
     # with maximum abs diff of precision with 2e-7
     glog.info(torch.max(stream_output - non_steam_output))
-    self.assertTrue(torch.allclose(non_steam_output, stream_output, rtol=3e-5, atol=3e-7))
+    self.assertTrue(
+        torch.allclose(non_steam_output, stream_output, rtol=3e-5, atol=3e-7))
 
   @parameterized.expand([(101,), (156,), (271,)])
   def test_cnn_block_2d_forward(self, feat_len):
@@ -108,14 +112,16 @@ class TestCnnBlock(unittest.TestCase):
     stream_output = []
     for frame_id in range(0, feat_len, 1):
       # Simulate streaming inference
-      output, cache = self._cnn_block_2d.inference(feats[:, frame_id:frame_id + 1, :], cache)
+      output, cache = self._cnn_block_2d.inference(
+          feats[:, frame_id:frame_id + 1, :], cache)
       stream_output.append(output)
     stream_output = torch.concat(stream_output, dim=1)
     self.assertEqual(stream_output.shape[1], feat_len)
 
     # with maximum abs diff of precision with 2e-7
     glog.info(torch.max(stream_output - non_steam_output))
-    self.assertTrue(torch.allclose(non_steam_output, stream_output, rtol=3e-5, atol=3e-7))
+    self.assertTrue(
+        torch.allclose(non_steam_output, stream_output, rtol=3e-5, atol=3e-7))
 
   @parameterized.expand([(101,), (156,), (271,)])
   def test_cldnn_forward(self, feat_len):
@@ -137,14 +143,16 @@ class TestCnnBlock(unittest.TestCase):
     stream_output = []
     for frame_id in range(0, feat_len, 1):
       # Simulate streaming inference
-      output, cache = self._cldnn.inference(feats[:, frame_id:frame_id + 1, :], cache)
+      output, cache = self._cldnn.inference(feats[:, frame_id:frame_id + 1, :],
+                                            cache)
       stream_output.append(output)
     stream_output = torch.concat(stream_output, dim=1)
     self.assertEqual(stream_output.shape[1], feat_len)
 
     # with maximum abs diff of precision with 2e-7
     glog.info(torch.max(stream_output - non_steam_output))
-    self.assertTrue(torch.allclose(non_steam_output, stream_output, rtol=3e-5, atol=3e-7))
+    self.assertTrue(
+        torch.allclose(non_steam_output, stream_output, rtol=3e-5, atol=3e-7))
 
 
 class TestDnnBlock(unittest.TestCase):
@@ -176,7 +184,8 @@ class TestRnnBlock(unittest.TestCase):
         "dropout": 0.0,
         "bidirectional": False
     }
-    self._lstm_rnn_block = LstmRnnBlock(_input_dim=64, config=RnnBlockConfig(**config))
+    self._lstm_rnn_block = LstmRnnBlock(_input_dim=64,
+                                        config=RnnBlockConfig(**config))
     config = {
         "rnn_type": "gru",
         "hidden_size": 512,
@@ -185,7 +194,8 @@ class TestRnnBlock(unittest.TestCase):
         "dropout": 0.0,
         "bidirectional": False
     }
-    self._gru_rnn_block = GruRnnBlock(_input_dim=128, config=RnnBlockConfig(**config))
+    self._gru_rnn_block = GruRnnBlock(_input_dim=128,
+                                      config=RnnBlockConfig(**config))
 
   @parameterized.expand([(101,), (156,), (271,)])
   def test_lstm_rnn_block_forward(self, feat_len):
@@ -208,13 +218,15 @@ class TestRnnBlock(unittest.TestCase):
     stream_output = []
     for frame_id in range(0, feat_len, 1):
       # Simulate streaming inference
-      output, cache = self._lstm_rnn_block.inference(feats[:, frame_id:frame_id + 1, :], cache)
+      output, cache = self._lstm_rnn_block.inference(
+          feats[:, frame_id:frame_id + 1, :], cache)
       stream_output.append(output)
     stream_output = torch.concat(stream_output, dim=1)
 
     # with maximum abs diff of precision with 2e-7
     glog.info(torch.max(stream_output - non_stream_output))
-    self.assertTrue(torch.allclose(non_stream_output, stream_output, rtol=3e-5, atol=3e-7))
+    self.assertTrue(
+        torch.allclose(non_stream_output, stream_output, rtol=3e-5, atol=3e-7))
 
   @parameterized.expand([(101,), (156,), (271,)])
   def test_gru_rnn_block_forward(self, feat_len):
@@ -237,13 +249,15 @@ class TestRnnBlock(unittest.TestCase):
     stream_output = []
     for frame_id in range(0, feat_len, 1):
       # Simulate streaming inference
-      output, cache = self._gru_rnn_block.inference(feats[:, frame_id:frame_id + 1, :], cache)
+      output, cache = self._gru_rnn_block.inference(
+          feats[:, frame_id:frame_id + 1, :], cache)
       stream_output.append(output)
     stream_output = torch.concat(stream_output, dim=1)
 
     # with maximum abs diff of precision with 2e-7
     glog.info(torch.max(stream_output - non_stream_output))
-    self.assertTrue(torch.allclose(non_stream_output, stream_output, rtol=3e-5, atol=3e-7))
+    self.assertTrue(
+        torch.allclose(non_stream_output, stream_output, rtol=3e-5, atol=3e-7))
 
 
 class TestGruCrdnn(unittest.TestCase):
@@ -275,9 +289,13 @@ class TestGruCrdnn(unittest.TestCase):
 
   def test_gru_crdnn_model_config_check(self):
     # check params of model are configured right
-    self.assertListEqual(self._crdnn._cnn_blocks._kernel_configs, [(3, 3), (5, 5), (3, 3)])
-    self.assertListEqual(self._crdnn._cnn_blocks._dilation_config, [(1, 1), (2, 2), (1, 1)])
-    self.assertListEqual(self._crdnn._cnn_blocks._in_channels_config, [1, 32, 32])
+    self.assertListEqual(self._crdnn._cnn_blocks._kernel_configs,
+                         [(3, 3), (5, 5), (3, 3)])
+    self.assertListEqual(self._crdnn._cnn_blocks._dilation_config, [(1, 1),
+                                                                    (2, 2),
+                                                                    (1, 1)])
+    self.assertListEqual(self._crdnn._cnn_blocks._in_channels_config,
+                         [1, 32, 32])
     self.assertEqual(self._crdnn._rnn_blocks._rnn_type, "gru")
 
     self.assertEqual(self._crdnn._rnn_blocks._hidden_size, 128)
@@ -290,9 +308,11 @@ class TestGruCrdnn(unittest.TestCase):
     output = self._crdnn(feats)
     output = self._crdnn.compute_logits(output)
 
-    self.assertEqual(self._crdnn._cnn_blocks.output_dim, self._crdnn._dnn_blocks._input_dim)
+    self.assertEqual(self._crdnn._cnn_blocks.output_dim,
+                     self._crdnn._dnn_blocks._input_dim)
     self.assertEqual(self._crdnn._dnn_blocks.output_dim, 64)
-    self.assertEqual(self._crdnn._rnn_blocks._input_size, self._crdnn._dnn_blocks.output_dim)
+    self.assertEqual(self._crdnn._rnn_blocks._input_size,
+                     self._crdnn._dnn_blocks.output_dim)
     self.assertEqual(self._crdnn._rnn_blocks.output_dim, 128)
 
     # Frame size maintained through blocks
@@ -300,7 +320,8 @@ class TestGruCrdnn(unittest.TestCase):
     self.assertEqual(output.shape[-1], 2)
 
     # validation of logits
-    self.assertTrue(torch.allclose(torch.sum(output, dim=-1), torch.ones(4, feat_len)))
+    self.assertTrue(
+        torch.allclose(torch.sum(output, dim=-1), torch.ones(4, feat_len)))
 
   @parameterized.expand([(101,), (156,), (271,), (456,), (786,)])
   def test_gru_crdnn_streaming_inference(self, feat_len):
@@ -315,13 +336,15 @@ class TestGruCrdnn(unittest.TestCase):
     stream_output = []
     for frame_id in range(0, feat_len, 1):
       # Simulate streaming inference
-      output, cache = self._crdnn.inference(feats[:, frame_id:frame_id + 1, :], cache)
+      output, cache = self._crdnn.inference(feats[:, frame_id:frame_id + 1, :],
+                                            cache)
       stream_output.append(output)
     stream_output = torch.concat(stream_output, dim=1)
 
     # with maximum abs diff of precision with 2e-7
     glog.info(torch.max(stream_output - non_stream_output))
-    self.assertTrue(torch.allclose(non_stream_output, stream_output, rtol=3e-5, atol=3e-7))
+    self.assertTrue(
+        torch.allclose(non_stream_output, stream_output, rtol=3e-5, atol=3e-7))
 
   @parameterized.expand([(101,), (156,), (271,), (456,), (786,)])
   def test_gru_crdnn_torchscript_export(self, feat_len):
@@ -337,13 +360,15 @@ class TestGruCrdnn(unittest.TestCase):
     stream_output = []
     for frame_id in range(0, feat_len, 1):
       # Simulate streaming inference
-      output, cache = torchscript_crdnn.inference(feats[:, frame_id:frame_id + 1, :], cache)
+      output, cache = torchscript_crdnn.inference(
+          feats[:, frame_id:frame_id + 1, :], cache)
       stream_output.append(output)
     stream_output = torch.concat(stream_output, dim=1)
 
     # with maximum abs diff of precision with 2e-7
     glog.info(torch.max(stream_output - non_stream_output))
-    self.assertTrue(torch.allclose(non_stream_output, stream_output, rtol=3e-5, atol=3e-7))
+    self.assertTrue(
+        torch.allclose(non_stream_output, stream_output, rtol=3e-5, atol=3e-7))
 
   def test_gru_crdnn_model_quant(self):
     # Unittest of vad mode1 quantization
@@ -360,7 +385,8 @@ class TestGruCrdnn(unittest.TestCase):
     # Dynamic quantize Linear and RNN layer
     model_quant = torch.quantization.quantize_dynamic(
         model_quant,  # the original model 
-        {torch.nn.Linear, torch.nn.GRU},  # a set of layers to dynamically quantize 
+        {torch.nn.Linear, torch.nn.GRU
+        },  # a set of layers to dynamically quantize 
         dtype=torch.qint8)
 
     # 524KB orig_model -> 280kB int8_model
@@ -399,7 +425,8 @@ class TestLstmCrdnn(unittest.TestCase):
     # check params of model are configured right
     self.assertListEqual(self._crdnn._cnn_blocks._kernel_configs, [5, 5, 5])
     self.assertListEqual(self._crdnn._cnn_blocks._dilation_config, [1, 1, 1])
-    self.assertListEqual(self._crdnn._cnn_blocks._in_channels_config, [64, 128, 256])
+    self.assertListEqual(self._crdnn._cnn_blocks._in_channels_config,
+                         [64, 128, 256])
     self.assertEqual(self._crdnn._rnn_blocks._rnn_type, "lstm")
 
     self.assertEqual(self._crdnn._rnn_blocks._hidden_size, 512)
@@ -412,9 +439,11 @@ class TestLstmCrdnn(unittest.TestCase):
     output = self._crdnn(feats)
     output = self._crdnn.compute_logits(output)
 
-    self.assertEqual(self._crdnn._cnn_blocks.output_dim, self._crdnn._dnn_blocks._input_dim)
+    self.assertEqual(self._crdnn._cnn_blocks.output_dim,
+                     self._crdnn._dnn_blocks._input_dim)
     self.assertEqual(self._crdnn._dnn_blocks.output_dim, 64)
-    self.assertEqual(self._crdnn._rnn_blocks._input_size, self._crdnn._dnn_blocks.output_dim)
+    self.assertEqual(self._crdnn._rnn_blocks._input_size,
+                     self._crdnn._dnn_blocks.output_dim)
     self.assertEqual(self._crdnn._rnn_blocks.output_dim, 512)
 
     # Frame size maintained through blocks
@@ -422,7 +451,8 @@ class TestLstmCrdnn(unittest.TestCase):
     self.assertEqual(output.shape[-1], 2)
 
     # validation of logits
-    self.assertTrue(torch.allclose(torch.sum(output, dim=-1), torch.ones(4, feat_len)))
+    self.assertTrue(
+        torch.allclose(torch.sum(output, dim=-1), torch.ones(4, feat_len)))
 
   @parameterized.expand([(101,), (156,), (271,), (456,), (786,)])
   def test_lstm_crdnn_streaming_inference(self, feat_len):
@@ -437,13 +467,15 @@ class TestLstmCrdnn(unittest.TestCase):
     stream_output = []
     for frame_id in range(0, feat_len, 1):
       # Simulate streaming inference
-      output, cache = self._crdnn.inference(feats[:, frame_id:frame_id + 1, :], cache)
+      output, cache = self._crdnn.inference(feats[:, frame_id:frame_id + 1, :],
+                                            cache)
       stream_output.append(output)
     stream_output = torch.concat(stream_output, dim=1)
 
     # with maximum abs diff of precision with 2e-7
     glog.info(torch.max(stream_output - non_stream_output))
-    self.assertTrue(torch.allclose(non_stream_output, stream_output, rtol=3e-5, atol=3e-7))
+    self.assertTrue(
+        torch.allclose(non_stream_output, stream_output, rtol=3e-5, atol=3e-7))
 
   @parameterized.expand([(101,), (156,), (271,), (456,), (786,)])
   def test_lstm_crdnn_torchscript_export(self, feat_len):
@@ -459,13 +491,15 @@ class TestLstmCrdnn(unittest.TestCase):
     stream_output = []
     for frame_id in range(0, feat_len, 1):
       # Simulate streaming inference
-      output, cache = torchscript_crdnn.inference(feats[:, frame_id:frame_id + 1, :], cache)
+      output, cache = torchscript_crdnn.inference(
+          feats[:, frame_id:frame_id + 1, :], cache)
       stream_output.append(output)
     stream_output = torch.concat(stream_output, dim=1)
 
     # with maximum abs diff of precision with 2e-7
     glog.info(torch.max(stream_output - non_stream_output))
-    self.assertTrue(torch.allclose(non_stream_output, stream_output, rtol=3e-5, atol=3e-7))
+    self.assertTrue(
+        torch.allclose(non_stream_output, stream_output, rtol=3e-5, atol=3e-7))
 
   def test_lstm_crdnn_model_quant(self):
     # Unittest of vad mode1 quantization
@@ -482,7 +516,8 @@ class TestLstmCrdnn(unittest.TestCase):
     # Dynamic quantize Linear and RNN layer
     model_quant = torch.quantization.quantize_dynamic(
         model_quant,  # the original model 
-        {torch.nn.Linear, torch.nn.LSTM},  # a set of layers to dynamically quantize 
+        {torch.nn.Linear, torch.nn.LSTM
+        },  # a set of layers to dynamically quantize 
         dtype=torch.qint8)
 
     # 17MB orig_model -> 6.6MB int8_model

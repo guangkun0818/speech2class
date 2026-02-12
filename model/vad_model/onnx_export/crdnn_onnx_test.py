@@ -67,7 +67,8 @@ class TestCrdnnOnnxExport(unittest.TestCase):
     onnx_output = ort_session.run(None, input_feed={})
 
     # Cache check
-    for th_out, onnx_out in zip([*torch_output[0], *torch_output[1]], onnx_output):
+    for th_out, onnx_out in zip([*torch_output[0], *torch_output[1]],
+                                onnx_output):
       self.assertTrue(torch.allclose(th_out, torch.Tensor(onnx_out)))
 
   def test_crdnn_infer_onnx_export(self):
@@ -83,7 +84,8 @@ class TestCrdnnOnnxExport(unittest.TestCase):
                       input_names=input_names,
                       output_names=output_names)
 
-    torch_logits, torch_cache = self._crdnn_infer(self._dummy_feats, self._dummy_cache)
+    torch_logits, torch_cache = self._crdnn_infer(self._dummy_feats,
+                                                  self._dummy_cache)
 
     ort_session = ort.InferenceSession("test_logs/crdnn_inference.onnx")
 
@@ -93,14 +95,17 @@ class TestCrdnnOnnxExport(unittest.TestCase):
       dummy_cache["cache_{}".format(i)] = cache.numpy()
 
     # Outputs of Onnx: ["logits", next_cache_0, ...]
-    onnx_output = ort_session.run(["logits"] + ["next_cache_%d" % i for i in range(5)],
+    onnx_output = ort_session.run(["logits"] +
+                                  ["next_cache_%d" % i for i in range(5)],
                                   input_feed={
                                       "feats": self._dummy_feats.numpy(),
                                       **dummy_cache
                                   })
 
-    for th_out, onnx_out in zip([torch_logits] + [*torch_cache[0], *torch_cache[1]], onnx_output):
-      self.assertTrue(torch.allclose(th_out, torch.Tensor(onnx_out), atol=1e-7, rtol=1e-4))
+    for th_out, onnx_out in zip(
+        [torch_logits] + [*torch_cache[0], *torch_cache[1]], onnx_output):
+      self.assertTrue(
+          torch.allclose(th_out, torch.Tensor(onnx_out), atol=1e-7, rtol=1e-4))
 
 
 if __name__ == "__main__":

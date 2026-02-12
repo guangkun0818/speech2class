@@ -36,7 +36,8 @@ class AmSoftmaxLoss(nn.Module):
     self._margin = config.margin
 
     # Initialize weights matrix as ground truth embedding to compute cosine sim
-    self._weights = nn.Parameter(torch.FloatTensor(self._num_classes, self._embedding_dim))
+    self._weights = nn.Parameter(
+        torch.FloatTensor(self._num_classes, self._embedding_dim))
     nn.init.xavier_uniform_(self._weights)
 
     self._criterion = torch.nn.CrossEntropyLoss()

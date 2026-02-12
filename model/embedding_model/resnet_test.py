@@ -31,7 +31,8 @@ class TestBasicBlock(unittest.TestCase):
     feats = torch.rand(1, 32, 80, 200)
     output = self._basic_block(feats)
     glog.info("The output of basicblock shape: {}".format(output.shape))
-    self.assertEqual(feats.shape[1] * self._basic_block.EXPANSION, output.shape[1])
+    self.assertEqual(feats.shape[1] * self._basic_block.EXPANSION,
+                     output.shape[1])
 
 
 class TestBottleNeckBlock(unittest.TestCase):
@@ -50,7 +51,8 @@ class TestBottleNeckBlock(unittest.TestCase):
     feats = torch.rand(1, 32, 80, 200)
     output = self._bottleneck_block(feats)
     glog.info("The output of bottlenectblock shape: {}".format(output.shape))
-    self.assertEqual(feats.shape[1] * self._bottleneck_block.EXPANSION, output.shape[1])
+    self.assertEqual(feats.shape[1] * self._bottleneck_block.EXPANSION,
+                     output.shape[1])
 
 
 class TestStatisticPooling(unittest.TestCase):

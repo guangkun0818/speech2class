@@ -52,7 +52,10 @@ class Metric(object):
     far, frr = cls._vad_far_frr(cls, preds=preds, labels=labels)
     return {"acc": acc, "far": far, "frr": frr}
 
-  def _vad_accuarcy(self, preds: torch.Tensor, labels: torch.Tensor, top_k=None):
+  def _vad_accuarcy(self,
+                    preds: torch.Tensor,
+                    labels: torch.Tensor,
+                    top_k=None):
     """ Compute ACC with of VAD task
             Args:
                 preds: torch.Size(Batch_size, Seq_len, 2) 
@@ -84,7 +87,9 @@ class Metric(object):
     metrics = {}
     if self._top_ks:
       for k in self._top_ks:
-        metrics["top_{}_acc".format(k)] = self._compute_acc(preds=preds, labels=labels, top_k=k)
+        metrics["top_{}_acc".format(k)] = self._compute_acc(preds=preds,
+                                                            labels=labels,
+                                                            top_k=k)
     else:
       metrics["acc"] = self._compute_acc(preds=preds, labels=labels, top_k=None)
 

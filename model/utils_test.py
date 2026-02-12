@@ -38,8 +38,10 @@ class TestMetrics(unittest.TestCase):
   ),
                          (
                              torch.Tensor([[0, 0, 0], [1, 1, 0]]),
-                             torch.Tensor([[[0.8438, 0.6637], [0.0040, 0.9138], [0.2288, 0.9692]],
-                                           [[0.5117, 0.8571], [0.3471, 0.5770], [0.4606, 0.1697]]]),
+                             torch.Tensor([[[0.8438, 0.6637], [0.0040, 0.9138],
+                                            [0.2288, 0.9692]],
+                                           [[0.5117, 0.8571], [0.3471, 0.5770],
+                                            [0.4606, 0.1697]]]),
                              torch.Tensor([0.66666666666666]),
                          )])
   def test_metric_topks_vad_task(self, label, preds, acc_true_value):
@@ -51,8 +53,8 @@ class TestMetrics(unittest.TestCase):
 
   @parameterized.expand([
       (torch.Tensor([[0, 0, 1, 1, 1]]),
-       torch.Tensor([[[0.4498, 0.7822], [0.6885, 0.3769], [0.6885, 0.3769], [0.6885, 0.3769],
-                      [0.4498, 0.7822]]]), 0.2, 0.4),
+       torch.Tensor([[[0.4498, 0.7822], [0.6885, 0.3769], [0.6885, 0.3769],
+                      [0.6885, 0.3769], [0.4498, 0.7822]]]), 0.2, 0.4),
   ])
   def test_metrics_vad_far_frr(self, labels, preds, far_t, frr_t):
     # Unittest of FAR FRR.
